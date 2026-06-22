@@ -28,6 +28,8 @@ Thumbs.db
 .idea/
 
 # Never push — PRD, Claude/agent files
+FLOCK.md
 FLOCK_PRD_v2.md
 CLAUDE.md
+LOG.md
 .claude/

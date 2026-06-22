@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flock cursor test</title>
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        font-family: system-ui, sans-serif;
+        background: #0f0f14;
+        color: #e6e6ee;
+        overflow: hidden;
+        cursor: crosshair;
+      }
+      #info {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        font-size: 13px;
+        line-height: 1.5;
+        z-index: 10;
+        background: #1a1a22;
+        padding: 10px 14px;
+        border-radius: 8px;
+      }
+      #info b {
+        color: #7c5cff;
+      }
+      .cursor {
+        position: fixed;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        transition:
+          left 0.08s linear,
+          top 0.08s linear;
+        box-shadow: 0 0 0 2px #0f0f14;
+      }
+      .cursor .label {
+        position: absolute;
+        left: 16px;
+        top: -4px;
+        white-space: nowrap;
+        font-size: 12px;
+        background: inherit;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <div><b>Flock</b> cursor test</div>
+      <div>you are <b id="me"></b></div>
+      <div>others here: <b id="count">0</b></div>
+      <div style="margin-top: 6px; opacity: 0.7">open this page in two tabs and move your mouse</div>
+    </div>
+
+    <script type="module">
+      import { FlockClient, normalizeCursorPosition } from "../packages/core/dist/index.js";
+
+      const colors = ["#7c5cff", "#ff5c8a", "#5cff9d", "#ffb15c", "#5cd5ff"];
+      const myId = "user-" + Math.random().toString(36).slice(2, 7);
+      const myColor = colors[Math.floor(Math.random() * colors.length)];
+      document.getElementById("me").textContent = myId;
+
+      const client = new FlockClient({ serverUrl: "ws://localhost:8787" });
+      const room = client.joinRoom("playground", {
+        userId: myId,
+        metadata: { name: myId, color: myColor },
+      });
+
+      const cursorEls = new Map();
+      const countEl = document.getElementById("count");
+
+      function upsertCursor(userId, cursor) {
+        let el = cursorEls.get(userId);
+        if (!el) {
+          el = document.createElement("div");
+          el.className = "cursor";
+          const color = cursor.metadata?.color ?? "#888";
+          el.style.background = color;
+          const label = document.createElement("span");
+          label.className = "label";
+          label.textContent = cursor.metadata?.name ?? userId;
+          label.style.background = color;
+          el.appendChild(label);
+          document.body.appendChild(el);
+          cursorEls.set(userId, el);
+        }
+        el.style.left = cursor.position.x * window.innerWidth + "px";
+        el.style.top = cursor.position.y * window.innerHeight + "px";
+      }
+
+      function removeCursor(userId) {
+        cursorEls.get(userId)?.remove();
+        cursorEls.delete(userId);
+        countEl.textContent = String(cursorEls.size);
+      }
+
+      room.on("cursor:update", (userId, cursor) => {
+        upsertCursor(userId, cursor);
+        countEl.textContent = String(cursorEls.size);
+        console.log("cursor:update", userId, cursor.position);
+      });
+
+      room.on("cursor:remove", (userId) => removeCursor(userId));
+      room.on("presence:leave", (userId) => removeCursor(userId));
+
+      window.addEventListener("mousemove", (e) => {
+        const pos = normalizeCursorPosition(
+          e.clientX,
+          e.clientY,
+          window.innerWidth,
+          window.innerHeight,
+        );
+        room.updateCursor(pos);
+      });
+
+      window.addEventListener("mouseout", () => {
+        // nothing yet; cursor:leave wiring comes with throttle work
+      });
+    </script>
+  </body>
+</html>

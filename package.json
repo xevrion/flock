@@ -1,0 +1,32 @@
+{
+  "name": "flock",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An embeddable real-time presence & multiplayer cursor SDK",
+  "license": "MIT",
+  "author": "Yash Bavadiya (@xevrion)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xevrion/flock.git"
+  },
+  "homepage": "https://flock.xevrion.dev",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  }
+}

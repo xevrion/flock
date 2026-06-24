@@ -37,6 +37,11 @@ export class Connection {
     ws.addEventListener("close", () => {
       for (const h of this.closeHandlers) h();
     });
+
+    // A connection that never opens (server down, refused) fires "error". Without
+    // a listener some implementations turn this into an unhandled exception, so
+    // we swallow it here. The matching "close" event drives the status change.
+    ws.addEventListener("error", () => {});
   }
 
   send(msg: ClientMessage): void {
@@ -65,7 +70,17 @@ export class Connection {
   }
 
   close(): void {
-    this.ws?.close();
+    const ws = this.ws;
     this.ws = undefined;
+    if (!ws) return;
+
+    // Closing a socket that hasn't finished connecting throws in some WebSocket
+    // implementations. If it's still opening, wait for it to open (or fail) and
+    // close it then.
+    if (ws.readyState === WebSocket.CONNECTING) {
+      ws.addEventListener("open", () => ws.close(), { once: true });
+    } else if (ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
   }
 }

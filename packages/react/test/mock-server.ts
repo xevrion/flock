@@ -12,6 +12,8 @@ export interface MockServer {
   push(message: unknown): void;
   // Snapshot of users returned in the next join:ack.
   setSnapshot(users: unknown[]): void;
+  // Resolves once at least one client has connected and sent its join.
+  waitForJoin(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -19,6 +21,10 @@ export async function startMockServer(): Promise<MockServer> {
   const wss = new WebSocketServer({ port: 0 });
   const clients = new Set<WebSocket>();
   let snapshot: unknown[] = [];
+  let joinResolve: (() => void) | undefined;
+  const joined = new Promise<void>((resolve) => {
+    joinResolve = resolve;
+  });
 
   wss.on("connection", (socket) => {
     clients.add(socket);
@@ -32,6 +38,7 @@ export async function startMockServer(): Promise<MockServer> {
       }
       if (msg.type === "join") {
         socket.send(JSON.stringify({ type: "join:ack", roomId: msg.roomId, users: snapshot }));
+        joinResolve?.();
       }
     });
   });
@@ -51,6 +58,9 @@ export async function startMockServer(): Promise<MockServer> {
     },
     setSnapshot(users) {
       snapshot = users;
+    },
+    waitForJoin() {
+      return joined;
     },
     close() {
       for (const c of clients) c.close();

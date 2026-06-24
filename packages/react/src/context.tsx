@@ -7,6 +7,10 @@ import type { FlockClient, FlockRoom } from "@flock-sdk/core";
 export interface FlockContextValue {
   client: FlockClient;
   room: FlockRoom;
+  // Whether useCursors should smooth remote cursor motion between updates.
+  interpolate: boolean;
+  // How long, in milliseconds, each move is spread over when interpolating.
+  interpolationMs: number;
 }
 
 export const FlockContext = createContext<FlockContextValue | null>(null);

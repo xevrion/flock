@@ -21,5 +21,6 @@ export type {
 export { FlockClient } from "./client.js";
 export { FlockError } from "./errors.js";
 export type { FlockErrorCode } from "./errors.js";
-export { interpolateCursor } from "./interpolate.js";
+export { interpolateCursor, createInterpolator } from "./interpolate.js";
+export type { Interpolator } from "./interpolate.js";
 export { normalizeCursorPosition } from "./throttle.js";

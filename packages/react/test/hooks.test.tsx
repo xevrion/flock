@@ -3,6 +3,9 @@ import { render, cleanup, screen, waitFor } from "@testing-library/react";
 import { FlockProvider } from "../src/provider.js";
 import { useCursors } from "../src/hooks/useCursors.js";
 import { usePresence } from "../src/hooks/usePresence.js";
+import { useMyPresence } from "../src/hooks/useMyPresence.js";
+import { useConnectionStatus } from "../src/hooks/useConnectionStatus.js";
+import { useRoom } from "../src/hooks/useRoom.js";
 import { startMockServer, type MockServer } from "./mock-server.js";
 
 let server: MockServer;
@@ -126,5 +129,62 @@ describe("useCursors", () => {
 
     server.push({ type: "user:left", roomId: "r", userId: "alice" });
     await waitFor(() => expect(screen.queryByText(/alice/)).toBeNull());
+  });
+});
+
+describe("useConnectionStatus", () => {
+  function Status() {
+    return <div data-testid="status">{useConnectionStatus()}</div>;
+  }
+
+  it("reaches connected once the socket opens", async () => {
+    render(
+      <Provider>
+        <Status />
+      </Provider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("status").textContent).toBe("connected"),
+    );
+  });
+});
+
+describe("useMyPresence", () => {
+  function Mine() {
+    const [me, update] = useMyPresence();
+    return (
+      <div>
+        <span data-testid="name">{me.name ?? "(none)"}</span>
+        <button onClick={() => update({ name: "Renamed" })}>rename</button>
+      </div>
+    );
+  }
+
+  it("returns local metadata and updates it optimistically", async () => {
+    render(
+      <FlockProvider serverUrl={server.url} roomId="r" userId="me" metadata={{ name: "Original" }}>
+        <Mine />
+      </FlockProvider>,
+    );
+    expect(screen.getByTestId("name").textContent).toBe("Original");
+
+    await server.waitForJoin();
+    screen.getByText("rename").click();
+    await waitFor(() => expect(screen.getByTestId("name").textContent).toBe("Renamed"));
+  });
+});
+
+describe("useRoom", () => {
+  function RoomId() {
+    return <div data-testid="room">{useRoom().roomId}</div>;
+  }
+
+  it("returns the raw room instance", () => {
+    render(
+      <Provider>
+        <RoomId />
+      </Provider>,
+    );
+    expect(screen.getByTestId("room").textContent).toBe("r");
   });
 });

@@ -1,8 +1,12 @@
-// Escape hatch that exposes the raw FlockRoom for advanced use cases the hooks
-// don't cover.
+// Escape hatch that returns the raw FlockRoom for advanced use the other hooks
+// don't cover (custom event handling, imperative calls).
 
+import { useContext } from "react";
 import type { FlockRoom } from "@flock-sdk/core";
+import { FlockContext } from "../context.js";
 
 export function useRoom(): FlockRoom {
-  throw new Error("useRoom is not implemented yet");
+  const ctx = useContext(FlockContext);
+  if (!ctx) throw new Error("useRoom must be used inside a <FlockProvider>");
+  return ctx.room;
 }

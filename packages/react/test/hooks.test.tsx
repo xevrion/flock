@@ -130,6 +130,84 @@ describe("useCursors", () => {
     server.push({ type: "user:left", roomId: "r", userId: "alice" });
     await waitFor(() => expect(screen.queryByText(/alice/)).toBeNull());
   });
+
+  it("glides toward a new position when interpolation is on", async () => {
+    function Tracker() {
+      const cursors = useCursors();
+      const c = cursors["alice"];
+      return <div data-testid="pos">{c ? `${c.position.x},${c.position.y}` : "none"}</div>;
+    }
+
+    render(
+      <FlockProvider serverUrl={server.url} roomId="r" userId="me" interpolationMs={200}>
+        <Tracker />
+      </FlockProvider>,
+    );
+
+    await server.waitForJoin();
+    // First position is parked exactly (no prior point to glide from).
+    server.push({
+      type: "cursor:updated",
+      roomId: "r",
+      userId: "alice",
+      position: { x: 0, y: 0 },
+      timestamp: Date.now(),
+    });
+    await waitFor(() => expect(screen.getByTestId("pos").textContent).toBe("0,0"));
+
+    // A second position should be approached gradually, so for a moment the
+    // rendered value sits strictly between the old and new x.
+    server.push({
+      type: "cursor:updated",
+      roomId: "r",
+      userId: "alice",
+      position: { x: 1, y: 0 },
+      timestamp: Date.now(),
+    });
+    await waitFor(() => {
+      const x = Number(screen.getByTestId("pos").textContent!.split(",")[0]);
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(1);
+    });
+    // And it eventually settles on the target.
+    await waitFor(() =>
+      expect(screen.getByTestId("pos").textContent).toBe("1,0"),
+    );
+  });
+
+  it("returns the raw position immediately when interpolation is off", async () => {
+    function Tracker() {
+      const cursors = useCursors();
+      const c = cursors["alice"];
+      return <div data-testid="pos">{c ? `${c.position.x},${c.position.y}` : "none"}</div>;
+    }
+
+    render(
+      <FlockProvider serverUrl={server.url} roomId="r" userId="me" interpolate={false}>
+        <Tracker />
+      </FlockProvider>,
+    );
+
+    await server.waitForJoin();
+    server.push({
+      type: "cursor:updated",
+      roomId: "r",
+      userId: "alice",
+      position: { x: 0.3, y: 0.6 },
+      timestamp: Date.now(),
+    });
+    await waitFor(() => expect(screen.getByTestId("pos").textContent).toBe("0.3,0.6"));
+
+    // A second position lands exactly, with no intermediate glide values.
+    server.push({
+      type: "cursor:updated",
+      roomId: "r",
+      userId: "alice",
+      position: { x: 0.9, y: 0.6 },
+      timestamp: Date.now(),
+    });
+    await waitFor(() => expect(screen.getByTestId("pos").textContent).toBe("0.9,0.6"));
+  });
 });
 
 describe("useConnectionStatus", () => {

@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlockProvider } from "@flock-sdk/react";
 import { Canvas } from "@/components/Canvas";
 import { PresenceBar } from "@/components/PresenceBar";
+import { StatusDot } from "@/components/StatusDot";
+import { Toaster } from "@/components/Toaster";
 
 const SERVER_URL =
   process.env.NEXT_PUBLIC_FLOCK_SERVER_URL ?? "ws://localhost:8787";
@@ -13,6 +15,10 @@ const COLORS = ["#7c5cff", "#ff7ab6", "#3ad6c2", "#ffb454", "#5ca8ff", "#9ae66e"
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+function randomCode(): string {
+  return Math.random().toString(36).slice(2, 8);
 }
 
 export default function Page() {
@@ -27,10 +33,29 @@ export default function Page() {
     [],
   );
 
+  // The room comes from the URL so two people can share a link to the same one.
+  // If there is no room in the URL yet, mint one and write it back. Resolved in
+  // an effect (not during render) to keep server and client markup in sync.
+  const [roomId, setRoomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let room = params.get("room");
+    if (!room) {
+      room = randomCode();
+      params.set("room", room);
+      const url = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", url);
+    }
+    setRoomId(room);
+  }, []);
+
+  if (!roomId) return null;
+
   return (
     <FlockProvider
       serverUrl={SERVER_URL}
-      roomId="canvas-demo"
+      roomId={roomId}
       userId={me.userId}
       metadata={{ name: me.name, color: me.color }}
       cursor={{ throttleMs: 30 }}
@@ -48,17 +73,30 @@ export default function Page() {
         <header
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
+            gap: 16,
           }}
         >
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700 }}>Flock canvas</h1>
             <p style={{ fontSize: 13, color: "#9aa0aa", marginTop: 2 }}>
-              Open this page in two windows and move your mouse over the canvas.
+              Share this URL to invite someone into room{" "}
+              <code style={{ color: "#c7b8ff" }}>{roomId}</code>, then move your
+              mouse over the canvas.
             </p>
           </div>
-          <PresenceBar me={{ name: me.name, color: me.color }} />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 8,
+            }}
+          >
+            <StatusDot />
+            <PresenceBar me={{ name: me.name, color: me.color }} />
+          </div>
         </header>
 
         <div
@@ -73,6 +111,7 @@ export default function Page() {
           <Canvas />
         </div>
       </main>
+      <Toaster />
     </FlockProvider>
   );
 }

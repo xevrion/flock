@@ -33,6 +33,8 @@ export default function Page() {
       roomId="canvas-demo"
       userId={me.userId}
       metadata={{ name: me.name, color: me.color }}
+      cursor={{ throttleMs: 30 }}
+      interpolationMs={100}
     >
       <main
         style={{

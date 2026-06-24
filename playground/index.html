@@ -35,9 +35,6 @@
         border-radius: 50%;
         transform: translate(-50%, -50%);
         pointer-events: none;
-        transition:
-          left 0.08s linear,
-          top 0.08s linear;
         box-shadow: 0 0 0 2px #0f0f14;
       }
       .cursor .label {
@@ -60,11 +57,18 @@
       <div>others here: <b id="count">0</b></div>
       <div>mousemoves/sec: <b id="raw">0</b></div>
       <div>cursor msgs/sec: <b id="sent">0</b></div>
+      <div style="margin-top: 6px">
+        <label><input type="checkbox" id="interp" checked /> interpolate</label>
+      </div>
       <div style="margin-top: 6px; opacity: 0.7">open this page in two tabs and move your mouse</div>
     </div>
 
     <script type="module">
-      import { FlockClient, normalizeCursorPosition } from "../packages/core/dist/index.js";
+      import {
+        FlockClient,
+        normalizeCursorPosition,
+        createInterpolator,
+      } from "../packages/core/dist/index.js";
 
       // Count how many cursor:move frames actually leave the socket, so the
       // throttle is visible: fast mouse movement still sends a capped rate.
@@ -97,8 +101,14 @@
 
       const cursorEls = new Map();
       const countEl = document.getElementById("count");
+      const interpToggle = document.getElementById("interp");
 
-      function upsertCursor(userId, cursor) {
+      // Last position the server sent for each user, used directly when
+      // interpolation is off and as the source of truth for the interpolator.
+      const lastPos = new Map();
+      const interp = createInterpolator(80);
+
+      function ensureEl(userId, cursor) {
         let el = cursorEls.get(userId);
         if (!el) {
           el = document.createElement("div");
@@ -113,24 +123,47 @@
           document.body.appendChild(el);
           cursorEls.set(userId, el);
         }
-        el.style.left = cursor.position.x * window.innerWidth + "px";
-        el.style.top = cursor.position.y * window.innerHeight + "px";
+        return el;
+      }
+
+      function place(el, pos) {
+        el.style.left = pos.x * window.innerWidth + "px";
+        el.style.top = pos.y * window.innerHeight + "px";
       }
 
       function removeCursor(userId) {
         cursorEls.get(userId)?.remove();
         cursorEls.delete(userId);
+        lastPos.delete(userId);
+        interp.remove(userId);
         countEl.textContent = String(cursorEls.size);
       }
 
       room.on("cursor:update", (userId, cursor) => {
-        upsertCursor(userId, cursor);
+        const el = ensureEl(userId, cursor);
+        lastPos.set(userId, cursor.position);
+        interp.push(userId, cursor.position);
+        // With interpolation off, snap straight to the received position. The
+        // animation loop handles the smoothed case.
+        if (!interpToggle.checked) place(el, cursor.position);
         countEl.textContent = String(cursorEls.size);
-        console.log("cursor:update", userId, cursor.position);
       });
 
       room.on("cursor:remove", (userId) => removeCursor(userId));
       room.on("presence:leave", (userId) => removeCursor(userId));
+
+      // Sample the interpolator every frame so cursors glide between the
+      // throttled updates. Untick "interpolate" to feel the raw, choppy motion.
+      function renderFrame() {
+        if (interpToggle.checked) {
+          for (const [userId, el] of cursorEls) {
+            const pos = interp.sample(userId) ?? lastPos.get(userId);
+            if (pos) place(el, pos);
+          }
+        }
+        requestAnimationFrame(renderFrame);
+      }
+      requestAnimationFrame(renderFrame);
 
       window.addEventListener("mousemove", (e) => {
         rawThisSecond++;

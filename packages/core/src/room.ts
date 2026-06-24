@@ -3,6 +3,7 @@
 // arrive so the app (or the React hooks) can react.
 
 import type { Connection } from "./connection.js";
+import { createThrottle, type Throttled } from "./throttle.js";
 import type {
   CursorPosition,
   PresenceUser,
@@ -16,6 +17,8 @@ import type { ServerMessage } from "./messages.js";
 
 type Handler = (...args: unknown[]) => void;
 
+const DEFAULT_CURSOR_THROTTLE_MS = 50;
+
 export class Room implements IFlockRoom {
   readonly roomId: string;
 
@@ -24,6 +27,7 @@ export class Room implements IFlockRoom {
   private cursors = new Map<UserId, UserCursor>();
   private presence = new Map<UserId, PresenceUser>();
   private listeners = new Map<string, Set<Handler>>();
+  private readonly sendCursor: Throttled<[CursorPosition]>;
 
   constructor(
     roomId: string,
@@ -33,6 +37,11 @@ export class Room implements IFlockRoom {
     this.roomId = roomId;
     this.userId = options.userId;
     this.myMetadata = options.metadata ?? {};
+
+    const throttleMs = options.cursor?.throttleMs ?? DEFAULT_CURSOR_THROTTLE_MS;
+    this.sendCursor = createThrottle((position: CursorPosition) => {
+      this.connection.send({ type: "cursor:move", roomId: this.roomId, position });
+    }, throttleMs);
   }
 
   // Called once the socket is open. Tells the server who we are.
@@ -58,7 +67,7 @@ export class Room implements IFlockRoom {
   }
 
   updateCursor(position: CursorPosition): void {
-    this.connection.send({ type: "cursor:move", roomId: this.roomId, position });
+    this.sendCursor(position);
   }
 
   updatePresence(metadata: Partial<UserMetadata>): void {
@@ -67,6 +76,7 @@ export class Room implements IFlockRoom {
   }
 
   leave(): void {
+    this.sendCursor.cancel();
     this.connection.send({ type: "leave", roomId: this.roomId });
   }
 

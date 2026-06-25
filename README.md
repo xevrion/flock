@@ -25,28 +25,16 @@ Redis instance:
 FLOCK_REDIS_URL=redis://localhost:6379 node packages/server/dist/cli.js
 ```
 
-### Playground
-
-A minimal vanilla page for quick cursor testing. In another terminal, serve the
-repo over HTTP:
-
-```bash
-python3 -m http.server 5500
-```
-
-Open http://localhost:5500/playground/index.html in two tabs and move your mouse.
-
-### Canvas demo
-
-A fuller React demo with a presence bar, connection status dot, join/leave
-toasts, and shareable room URLs.
+Then start the demo:
 
 ```bash
 pnpm --filter demo-canvas dev
 ```
 
 Open http://localhost:3100 in two tabs. Copy the `?room=` code from the first
-tab's URL into the second so both join the same room, then move your mouse.
+tab's URL into the second so both join the same room, then move your mouse. The
+demo has a presence bar, a connection status dot, join/leave toasts, and
+shareable room URLs.
 
 ## What to test
 
@@ -63,3 +51,16 @@ tab's URL into the second so both join the same room, then move your mouse.
   (default 30s) lapses without a heartbeat, the other tab drops that user.
 - **Heartbeats.** Open DevTools, Network, WS, select the connection, and watch
   `heartbeat` / `heartbeat:ack` frames every 10s while connected.
+
+## Debugging the core SDK
+
+`playground/index.html` is a no-framework page that imports `@flock-sdk/core`
+directly, useful for testing the transport without React. Build the packages,
+start the server, then serve the repo over HTTP:
+
+```bash
+python3 -m http.server 5500
+```
+
+Open http://localhost:5500/playground/index.html in two tabs. It also shows the
+cursor throttle and interpolation counters.

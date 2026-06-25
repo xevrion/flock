@@ -17,6 +17,14 @@ Start the server:
 node packages/server/dist/cli.js
 ```
 
+The server runs in-memory by default. To enable TTL-based presence (so a
+dropped connection is evicted after it stops sending heartbeats), point it at a
+Redis instance:
+
+```bash
+FLOCK_REDIS_URL=redis://localhost:6379 node packages/server/dist/cli.js
+```
+
 In another terminal, serve the playground:
 
 ```bash

@@ -93,6 +93,43 @@ describe("FlockServer", () => {
     b.close();
   });
 
+  it("keeps a user present when a stale duplicate socket closes", async () => {
+    const a = await connect();
+    a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));
+    await waitFor(a, "join:ack");
+
+    // b joins on one socket, then opens a second socket for the same userId
+    // (a refresh or a duplicate tab) and the first socket closes afterwards.
+    const b1 = await connect();
+    b1.send(JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: {} }));
+    await waitFor(a, "user:joined");
+
+    const b2 = await connect();
+    b2.send(JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: {} }));
+    await waitFor(b2, "join:ack");
+
+    // Closing the stale first socket must NOT evict b, who is live on b2.
+    const stillHere = new Promise<boolean>((resolve) => {
+      const onMsg = (data: Buffer) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "user:left" && msg.userId === "b") resolve(false);
+      };
+      a.on("message", onMsg);
+      setTimeout(() => resolve(true), 400);
+    });
+    b1.close();
+
+    expect(await stillHere).toBe(true);
+    // b is still reachable on the live socket.
+    const moved = waitFor(a, "cursor:updated");
+    b2.send(JSON.stringify({ type: "cursor:move", roomId: "r", position: { x: 0.1, y: 0.2 } }));
+    const msg = await moved;
+    expect(msg.userId).toBe("b");
+
+    a.close();
+    b2.close();
+  });
+
   it("relays cursor moves to other members", async () => {
     const a = await connect();
     a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));

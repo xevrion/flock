@@ -81,6 +81,7 @@ describe("Connection heartbeat", () => {
     expect(sentTypes(instances[0]!)).toEqual([]);
 
     vi.advanceTimersByTime(1000);
+    instances[0]!.receive({ type: "heartbeat:ack" });
     const beats = instances[0]!.sent.map((s) => JSON.parse(s));
     expect(beats).toEqual([
       { type: "heartbeat", roomId: "r1" },
@@ -88,6 +89,7 @@ describe("Connection heartbeat", () => {
     ]);
 
     vi.advanceTimersByTime(1000);
+    instances[0]!.receive({ type: "heartbeat:ack" });
     expect(sentTypes(instances[0]!).filter((t) => t === "heartbeat")).toHaveLength(4);
   });
 
@@ -140,5 +142,104 @@ describe("Connection heartbeat", () => {
     // But with no further ack, it eventually goes stale.
     vi.advanceTimersByTime(1000);
     expect(stale).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Connection reconnection", () => {
+  it("reconnects after an unexpected close", () => {
+    const conn = new Connection("ws://x", { reconnect: { baseDelayMs: 1000 } });
+    const reconnecting = vi.fn();
+    conn.onReconnecting(reconnecting);
+    conn.connect();
+    instances[0]!.open();
+    expect(instances).toHaveLength(1);
+
+    // Server drops us.
+    instances[0]!.close();
+    expect(reconnecting).toHaveBeenCalledWith(1);
+
+    // After the base delay a new socket is opened.
+    vi.advanceTimersByTime(1000);
+    expect(instances).toHaveLength(2);
+  });
+
+  it("doubles the backoff each failed attempt and caps at maxDelayMs", () => {
+    const conn = new Connection("ws://x", {
+      reconnect: { baseDelayMs: 1000, maxDelayMs: 4000 },
+    });
+    conn.connect();
+
+    // First socket never opens; its close triggers the backoff sequence.
+    instances[0]!.close();
+    // attempt 1: 1000ms
+    vi.advanceTimersByTime(999);
+    expect(instances).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(instances).toHaveLength(2);
+
+    instances[1]!.close();
+    // attempt 2: 2000ms
+    vi.advanceTimersByTime(1999);
+    expect(instances).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(instances).toHaveLength(3);
+
+    instances[2]!.close();
+    // attempt 3: 4000ms (would be 4000, cap is 4000)
+    vi.advanceTimersByTime(3999);
+    expect(instances).toHaveLength(3);
+    vi.advanceTimersByTime(1);
+    expect(instances).toHaveLength(4);
+
+    instances[3]!.close();
+    // attempt 4: still capped at 4000ms
+    vi.advanceTimersByTime(4000);
+    expect(instances).toHaveLength(5);
+  });
+
+  it("resets the backoff after a successful reconnect", () => {
+    const conn = new Connection("ws://x", { reconnect: { baseDelayMs: 1000 } });
+    conn.connect();
+
+    instances[0]!.close();
+    vi.advanceTimersByTime(1000);
+    instances[1]!.close();
+    vi.advanceTimersByTime(2000);
+    // attempt 2 opened socket 3, which now successfully opens.
+    instances[2]!.open();
+
+    // A later drop starts the backoff from the base delay again.
+    instances[2]!.close();
+    vi.advanceTimersByTime(1000);
+    expect(instances).toHaveLength(4);
+  });
+
+  it("gives up after maxAttempts and reports failure", () => {
+    const conn = new Connection("ws://x", {
+      reconnect: { baseDelayMs: 1000, maxAttempts: 2 },
+    });
+    const failed = vi.fn();
+    conn.onReconnectFailed(failed);
+    conn.connect();
+
+    instances[0]!.close(); // attempt 1
+    vi.advanceTimersByTime(1000);
+    instances[1]!.close(); // attempt 2
+    vi.advanceTimersByTime(2000);
+    instances[2]!.close(); // would be attempt 3, but maxAttempts is 2
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reconnect after a deliberate close", () => {
+    const conn = new Connection("ws://x", { reconnect: { baseDelayMs: 1000 } });
+    const reconnecting = vi.fn();
+    conn.onReconnecting(reconnecting);
+    conn.connect();
+    instances[0]!.open();
+
+    conn.close();
+    vi.advanceTimersByTime(10000);
+    expect(reconnecting).not.toHaveBeenCalled();
+    expect(instances).toHaveLength(1);
   });
 });

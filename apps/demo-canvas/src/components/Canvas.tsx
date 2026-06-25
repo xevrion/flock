@@ -32,7 +32,7 @@ export function Canvas() {
       if (!ctx) return;
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, rect.width, rect.height);
-      ctx.fillStyle = "#1b1f27";
+      ctx.fillStyle = "#262b34";
       const gap = 28;
       for (let gx = gap; gx < rect.width; gx += gap) {
         for (let gy = gap; gy < rect.height; gy += gap) {

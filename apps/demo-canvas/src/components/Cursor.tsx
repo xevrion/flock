@@ -25,23 +25,24 @@ export function Cursor({ x, y, name, color }: CursorProps) {
         <path
           d="M3 2L16 9.5L9.5 11L7 17L3 2Z"
           fill={color}
-          stroke="#0f1115"
-          strokeWidth="1"
+          stroke="#0b0d11"
+          strokeWidth="1.25"
           strokeLinejoin="round"
         />
       </svg>
       <span
         style={{
           position: "absolute",
-          left: 16,
-          top: 14,
+          left: 15,
+          top: 15,
           padding: "2px 7px",
           borderRadius: 6,
           background: color,
-          color: "#0f1115",
-          fontSize: 12,
-          fontWeight: 600,
+          color: "#0b0d11",
+          fontSize: 11.5,
+          fontWeight: 650,
           whiteSpace: "nowrap",
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
         }}
       >
         {name}

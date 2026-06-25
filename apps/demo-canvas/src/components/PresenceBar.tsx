@@ -16,23 +16,28 @@ function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-function Avatar({ name, color, ring }: { name: string; color: string; ring?: boolean }) {
+function Avatar({ name, color, you }: { name: string; color: string; you?: boolean }) {
   return (
     <div
-      title={name}
+      title={you ? `${name} (you)` : name}
       style={{
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         borderRadius: "50%",
         background: color,
-        color: "#0f1115",
+        color: "#0b0d11",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: 700,
-        border: ring ? "2px solid #e6e8ec" : "2px solid transparent",
-        marginLeft: -6,
+        // Ring in the page background so overlapping avatars read as separate
+        // discs; the local user gets a faint accent ring to stand out.
+        boxShadow: you
+          ? "0 0 0 2px var(--bg), 0 0 0 3px var(--accent)"
+          : "0 0 0 2px var(--bg)",
+        marginLeft: -7,
+        position: "relative",
       }}
     >
       {initials(name)}
@@ -42,14 +47,12 @@ function Avatar({ name, color, ring }: { name: string; color: string; ring?: boo
 
 export function PresenceBar({ me }: PresenceBarProps) {
   const others = usePresence();
+  const count = others.length + 1;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{ fontSize: 13, color: "#9aa0aa" }}>
-        {others.length + 1} here
-      </span>
-      <div style={{ display: "flex", paddingLeft: 6 }}>
-        <Avatar name={`${me.name} (you)`} color={me.color} ring />
+    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+      <div style={{ display: "flex", paddingLeft: 7 }}>
+        <Avatar name={me.name} color={me.color} you />
         {others.map((u) => (
           <Avatar
             key={u.userId}
@@ -58,6 +61,9 @@ export function PresenceBar({ me }: PresenceBarProps) {
           />
         ))}
       </div>
+      <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+        {count} {count === 1 ? "person" : "people"}
+      </span>
     </div>
   );
 }

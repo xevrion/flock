@@ -315,6 +315,16 @@ export class FlockServer {
     if (!state?.roomId || !state.userId) return;
 
     const { roomId, userId } = state;
+
+    // If a newer socket for this same user has already taken over the room slot
+    // (a duplicate tab, a refresh, or a reconnect that beat this close), this is
+    // a stale socket closing. Leave the live user in place and stay quiet.
+    const current = this.rooms.getClient(roomId, userId);
+    if (current && current.socket !== socket) {
+      this.log.info({ roomId, userId }, "stale socket closed, keeping live user");
+      return;
+    }
+
     this.rooms.leaveRoom(roomId, userId);
     this.log.info({ roomId, userId }, "user left");
 

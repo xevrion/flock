@@ -19,9 +19,21 @@ export function usePresence(): PresenceUser[] {
     const offLeave = room.on("presence:leave", (userId) => {
       setUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
+    // A presence update changes only the fields in the patch. Merge it into the
+    // existing metadata so untouched fields (name, color, etc.) are preserved.
+    const offUpdate = room.on("presence:update", (userId, metadata) => {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.userId === userId
+            ? { ...u, metadata: { ...u.metadata, ...metadata } }
+            : u,
+        ),
+      );
+    });
     return () => {
       offJoin();
       offLeave();
+      offUpdate();
     };
   }, [room]);
 

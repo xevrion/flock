@@ -7,7 +7,7 @@ import { Redis } from "ioredis";
 import { createHealthServer } from "./health.js";
 import { createLogger, type Logger } from "./logger.js";
 import { RoomManager } from "./room-manager.js";
-import { PresenceStore } from "./presence.js";
+import { PresenceStore, parsePresenceKey } from "./presence.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
@@ -58,6 +58,7 @@ export class FlockServer {
   private wss?: WebSocketServer;
   private sockets = new Map<WebSocket, SocketState>();
   private redis?: Redis;
+  private subscriber?: Redis;
   private presence?: PresenceStore;
 
   constructor(options: FlockServerOptions = {}) {
@@ -73,6 +74,7 @@ export class FlockServer {
       this.redis = new Redis(this.redisUrl, { lazyConnect: false });
       this.redis.on("error", (err) => this.log.warn({ err }, "redis error"));
       this.presence = new PresenceStore(this.redis, this.ttlSeconds);
+      this.subscribeToExpiry();
       this.log.info("redis presence enabled");
     }
 
@@ -111,11 +113,52 @@ export class FlockServer {
     this.sockets.clear();
     await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
     await new Promise<void>((resolve) => this.http?.close(() => resolve()));
+    if (this.subscriber) {
+      this.subscriber.disconnect();
+      this.subscriber = undefined;
+    }
     if (this.redis) {
       this.redis.disconnect();
       this.redis = undefined;
       this.presence = undefined;
     }
+  }
+
+  // Listens for Redis expired-key events on a dedicated connection (a connection
+  // in subscribe mode can't run normal commands). When a presence key lapses
+  // without a heartbeat, the user disconnected ungracefully and we evict them.
+  private subscribeToExpiry(): void {
+    const db = this.redis?.options.db ?? 0;
+    const channel = `__keyevent@${db}__:expired`;
+
+    this.subscriber = this.redis!.duplicate();
+    this.subscriber.on("error", (err) =>
+      this.log.warn({ err }, "redis subscriber error"),
+    );
+    this.subscriber.subscribe(channel, (err) => {
+      if (err) this.log.warn({ err }, "failed to subscribe to expiry events");
+    });
+    this.subscriber.on("message", (_channel, key) => {
+      const parsed = parsePresenceKey(key);
+      if (parsed) {
+        this.handleExpiredPresence(parsed.roomId, parsed.userId);
+      }
+    });
+  }
+
+  // Drops an evicted user from the room's member set, clears their cursor, and
+  // tells everyone still connected to this instance that they left.
+  private handleExpiredPresence(roomId: string, userId: string): void {
+    this.log.info({ roomId, userId }, "presence expired, evicting user");
+
+    if (this.presence) {
+      this.presence
+        .removePresence(roomId, userId)
+        .catch((err) => this.log.warn({ err }, "failed to clean up expired presence"));
+    }
+
+    this.rooms.leaveRoom(roomId, userId);
+    this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
   }
 
   getRoomCount(): number {

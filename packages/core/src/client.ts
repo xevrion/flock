@@ -19,7 +19,9 @@ export class FlockClient {
   private statusListeners = new Set<(status: ConnectionStatus) => void>();
 
   constructor(options: FlockClientOptions) {
-    this.connection = new Connection(options.serverUrl);
+    this.connection = new Connection(options.serverUrl, {
+      getRoomIds: () => [...this.rooms.keys()],
+    });
 
     this.connection.onOpen(() => {
       this.setStatus("connected");

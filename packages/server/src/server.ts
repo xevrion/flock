@@ -183,6 +183,9 @@ export class FlockServer {
       case "cursor:leave":
         this.handleCursorLeave(socket);
         break;
+      case "presence:update":
+        this.handlePresenceUpdate(socket, msg.metadata);
+        break;
       case "heartbeat":
         this.handleHeartbeat(socket);
         break;
@@ -277,6 +280,33 @@ export class FlockServer {
     }
 
     this.broadcast(roomId, userId, { type: "cursor:removed", roomId, userId });
+  }
+
+  // Merges a partial metadata patch into the user's stored presence and tells
+  // the rest of the room about it. Keeps the in-memory copy in sync so a later
+  // join:ack snapshot carries the updated metadata too.
+  private handlePresenceUpdate(
+    socket: WebSocket,
+    metadata: Record<string, unknown>,
+  ): void {
+    const { roomId, userId } = this.sockets.get(socket) ?? {};
+    if (!roomId || !userId) return;
+
+    const client = this.rooms.getClient(roomId, userId);
+    if (client) client.metadata = { ...client.metadata, ...metadata };
+
+    if (this.presence) {
+      this.presence
+        .updateMetadata(roomId, userId, metadata)
+        .catch((err) => this.log.warn({ err }, "failed to update presence metadata"));
+    }
+
+    this.broadcast(roomId, userId, {
+      type: "presence:updated",
+      roomId,
+      userId,
+      metadata,
+    });
   }
 
   private handleClose(socket: WebSocket): void {

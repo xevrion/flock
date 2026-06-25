@@ -71,6 +71,28 @@ describe("FlockServer", () => {
     a.close();
   });
 
+  it("broadcasts presence updates to other members", async () => {
+    const a = await connect();
+    a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));
+    await waitFor(a, "join:ack");
+
+    const b = await connect();
+    b.send(
+      JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: { name: "Bob" } }),
+    );
+    await waitFor(b, "join:ack");
+
+    const updated = waitFor(a, "presence:updated");
+    b.send(JSON.stringify({ type: "presence:update", roomId: "r", metadata: { status: "idle" } }));
+
+    const msg = await updated;
+    expect(msg.userId).toBe("b");
+    expect(msg.metadata).toEqual({ status: "idle" });
+
+    a.close();
+    b.close();
+  });
+
   it("relays cursor moves to other members", async () => {
     const a = await connect();
     a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));

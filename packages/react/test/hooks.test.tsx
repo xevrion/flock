@@ -77,6 +77,41 @@ describe("usePresence", () => {
     server.push({ type: "user:left", roomId: "r", userId: "bob" });
     await waitFor(() => expect(screen.queryByText("bob")).toBeNull());
   });
+
+  it("merges a partial presence update without dropping other metadata", async () => {
+    function PresenceMeta() {
+      const users = usePresence();
+      const bob = users.find((u) => u.userId === "bob");
+      if (!bob) return null;
+      return (
+        <div>{`bob:${bob.metadata.name ?? ""}:${(bob.metadata.status as string) ?? ""}`}</div>
+      );
+    }
+
+    render(
+      <Provider>
+        <PresenceMeta />
+      </Provider>,
+    );
+
+    await server.waitForJoin();
+    server.push({
+      type: "user:joined",
+      roomId: "r",
+      userId: "bob",
+      metadata: { name: "Bob", color: "#00f" },
+    });
+    await waitFor(() => expect(screen.getByText("bob:Bob:")).toBeDefined());
+
+    // Update only status; name (and color) must survive.
+    server.push({
+      type: "presence:updated",
+      roomId: "r",
+      userId: "bob",
+      metadata: { status: "idle" },
+    });
+    await waitFor(() => expect(screen.getByText("bob:Bob:idle")).toBeDefined());
+  });
 });
 
 describe("useCursors", () => {

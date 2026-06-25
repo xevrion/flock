@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { Redis } from "ioredis";
 import { FlockServer } from "../src/server.js";
@@ -101,5 +101,37 @@ describe("presence TTL eviction", () => {
     clearInterval(beat);
     a.close();
     b.close();
+  }, 10000);
+
+  it("merges a presence update into the stored metadata hash", async () => {
+    if (!redisAvailable) {
+      console.warn("skipping: redis not reachable");
+      return;
+    }
+
+    const room = `meta-${Date.now()}`;
+    const redis = new Redis(REDIS_URL);
+
+    const a = await connect();
+    a.send(
+      JSON.stringify({
+        type: "join",
+        roomId: room,
+        userId: "a",
+        metadata: { name: "Alice", color: "#7c5cff" },
+      }),
+    );
+    await waitFor(a, "join:ack");
+
+    a.send(JSON.stringify({ type: "presence:update", roomId: room, metadata: { status: "idle" } }));
+    await new Promise((r) => setTimeout(r, 200));
+
+    const raw = await redis.hget(`flock:presence:${room}:a`, "metadata");
+    const stored = JSON.parse(raw!);
+    // The patch added status without dropping the original name and color.
+    expect(stored).toEqual({ name: "Alice", color: "#7c5cff", status: "idle" });
+
+    a.close();
+    redis.disconnect();
   }, 10000);
 });

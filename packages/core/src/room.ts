@@ -54,6 +54,20 @@ export class Room implements IFlockRoom {
     });
   }
 
+  // Clears the remote view of the room (who's here, where their cursors are)
+  // and fires leave events for everyone, so a reconnect starts from a clean
+  // slate and the fresh join:ack snapshot rebuilds it. Our own metadata is kept
+  // so the re-join restores it.
+  resetRemoteState(): void {
+    const userIds = [...this.presence.keys()];
+    this.presence.clear();
+    this.cursors.clear();
+    for (const userId of userIds) {
+      this.emit("presence:leave", userId);
+      this.emit("cursor:remove", userId);
+    }
+  }
+
   getCursors(): Map<UserId, UserCursor> {
     return new Map(this.cursors);
   }

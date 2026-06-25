@@ -3,10 +3,14 @@
 
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
+import { Redis } from "ioredis";
 import { createHealthServer } from "./health.js";
 import { createLogger, type Logger } from "./logger.js";
 import { RoomManager } from "./room-manager.js";
+import { PresenceStore } from "./presence.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
+
+const DEFAULT_TTL_SECONDS = 30;
 
 export interface FlockServerOptions {
   port?: number;
@@ -28,6 +32,15 @@ function envPort(): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+// Reads the presence TTL from the environment, falling back to the default if
+// it's missing or not a positive number.
+function envTtlSeconds(): number | undefined {
+  const raw = process.env.FLOCK_PRESENCE_TTL_SECONDS;
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 // We hang a little bit of state off each socket so we know, on disconnect,
 // which user in which room just went away.
 interface SocketState {
@@ -39,16 +52,30 @@ export class FlockServer {
   private readonly port: number;
   private readonly log: Logger;
   private readonly rooms = new RoomManager();
+  private readonly redisUrl?: string;
+  private readonly ttlSeconds: number;
   private http?: Server;
   private wss?: WebSocketServer;
   private sockets = new Map<WebSocket, SocketState>();
+  private redis?: Redis;
+  private presence?: PresenceStore;
 
   constructor(options: FlockServerOptions = {}) {
     this.port = options.port ?? envPort() ?? 8787;
     this.log = createLogger(options.logger ?? true);
+    this.redisUrl = options.redisUrl ?? process.env.FLOCK_REDIS_URL;
+    this.ttlSeconds =
+      options.presence?.ttlSeconds ?? envTtlSeconds() ?? DEFAULT_TTL_SECONDS;
   }
 
   start(): Promise<void> {
+    if (this.redisUrl) {
+      this.redis = new Redis(this.redisUrl, { lazyConnect: false });
+      this.redis.on("error", (err) => this.log.warn({ err }, "redis error"));
+      this.presence = new PresenceStore(this.redis, this.ttlSeconds);
+      this.log.info("redis presence enabled");
+    }
+
     this.http = createHealthServer();
     this.wss = new WebSocketServer({ server: this.http });
 
@@ -84,6 +111,11 @@ export class FlockServer {
     this.sockets.clear();
     await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
     await new Promise<void>((resolve) => this.http?.close(() => resolve()));
+    if (this.redis) {
+      this.redis.disconnect();
+      this.redis = undefined;
+      this.presence = undefined;
+    }
   }
 
   getRoomCount(): number {
@@ -109,7 +141,7 @@ export class FlockServer {
         this.handleCursorLeave(socket);
         break;
       case "heartbeat":
-        this.send(socket, { type: "heartbeat:ack" });
+        this.handleHeartbeat(socket);
         break;
       default:
         this.log.warn({ type: (msg as { type: string }).type }, "unknown message type");
@@ -133,6 +165,12 @@ export class FlockServer {
     this.sockets.set(socket, { roomId, userId });
     this.log.info({ roomId, userId }, "user joined");
 
+    if (this.presence) {
+      this.presence
+        .setPresence(roomId, userId, metadata)
+        .catch((err) => this.log.warn({ err }, "failed to set presence"));
+    }
+
     this.send(socket, { type: "join:ack", roomId, users: existing });
 
     // Tell everyone already in the room that someone new showed up.
@@ -142,6 +180,18 @@ export class FlockServer {
       userId,
       metadata,
     });
+  }
+
+  // Keeps a user's presence alive in Redis and acknowledges so the client knows
+  // the server is still there.
+  private handleHeartbeat(socket: WebSocket): void {
+    const { roomId, userId } = this.sockets.get(socket) ?? {};
+    if (this.presence && roomId && userId) {
+      this.presence
+        .refreshPresence(roomId, userId)
+        .catch((err) => this.log.warn({ err }, "failed to refresh presence"));
+    }
+    this.send(socket, { type: "heartbeat:ack" });
   }
 
   private handleLeave(socket: WebSocket): void {
@@ -154,6 +204,12 @@ export class FlockServer {
 
     const client = this.rooms.getClient(roomId, userId);
     if (client) client.cursor = position;
+
+    if (this.presence) {
+      this.presence
+        .setCursor(roomId, userId, position)
+        .catch((err) => this.log.warn({ err }, "failed to store cursor"));
+    }
 
     this.broadcast(roomId, userId, {
       type: "cursor:updated",
@@ -171,6 +227,12 @@ export class FlockServer {
     const client = this.rooms.getClient(roomId, userId);
     if (client) client.cursor = undefined;
 
+    if (this.presence) {
+      this.presence
+        .clearCursor(roomId, userId)
+        .catch((err) => this.log.warn({ err }, "failed to clear cursor"));
+    }
+
     this.broadcast(roomId, userId, { type: "cursor:removed", roomId, userId });
   }
 
@@ -182,6 +244,12 @@ export class FlockServer {
     const { roomId, userId } = state;
     this.rooms.leaveRoom(roomId, userId);
     this.log.info({ roomId, userId }, "user left");
+
+    if (this.presence) {
+      this.presence
+        .removePresence(roomId, userId)
+        .catch((err) => this.log.warn({ err }, "failed to remove presence"));
+    }
 
     this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
   }

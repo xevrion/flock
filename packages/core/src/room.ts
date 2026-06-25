@@ -28,6 +28,11 @@ export class Room implements IFlockRoom {
   private presence = new Map<UserId, PresenceUser>();
   private listeners = new Map<string, Set<Handler>>();
   private readonly sendCursor: Throttled<[CursorPosition]>;
+  // The server only accepts presence updates once it has processed our join. If
+  // the app updates presence before join:ack lands, we hold the patch here and
+  // send it the moment the ack arrives.
+  private acked = false;
+  private pendingPresence?: Partial<UserMetadata>;
 
   constructor(
     roomId: string,
@@ -44,8 +49,10 @@ export class Room implements IFlockRoom {
     }, throttleMs);
   }
 
-  // Called once the socket is open. Tells the server who we are.
+  // Called once the socket is open. Tells the server who we are. Any presence
+  // updates made before the ack are held until it arrives.
   join(): void {
+    this.acked = false;
     this.connection.send({
       type: "join",
       roomId: this.roomId,
@@ -86,6 +93,11 @@ export class Room implements IFlockRoom {
 
   updatePresence(metadata: Partial<UserMetadata>): void {
     this.myMetadata = { ...this.myMetadata, ...metadata };
+    if (!this.acked) {
+      // Not joined yet: accumulate the patch and flush it once the ack lands.
+      this.pendingPresence = { ...this.pendingPresence, ...metadata };
+      return;
+    }
     this.connection.send({ type: "presence:update", roomId: this.roomId, metadata });
   }
 
@@ -124,6 +136,17 @@ export class Room implements IFlockRoom {
   handleMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case "join:ack": {
+        this.acked = true;
+        // Flush any presence change the app made before we were acked.
+        if (this.pendingPresence) {
+          const patch = this.pendingPresence;
+          this.pendingPresence = undefined;
+          this.connection.send({
+            type: "presence:update",
+            roomId: this.roomId,
+            metadata: patch,
+          });
+        }
         for (const user of msg.users) {
           this.presence.set(user.userId, {
             userId: user.userId,

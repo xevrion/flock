@@ -66,52 +66,106 @@ export default function Page() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
-          padding: 20,
-          gap: 16,
+          padding: "28px 32px 32px",
+          gap: 20,
+          maxWidth: 1280,
+          margin: "0 auto",
+          width: "100%",
         }}
       >
         <header
           style={{
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "space-between",
-            gap: 16,
+            gap: 24,
           }}
         >
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700 }}>Flock canvas</h1>
-            <p style={{ fontSize: 13, color: "#9aa0aa", marginTop: 2 }}>
-              Share this URL to invite someone into room{" "}
-              <code style={{ color: "#c7b8ff" }}>{roomId}</code>, then move your
-              mouse over the canvas.
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 650,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Flock
+            </h1>
+            <RoomCode code={roomId} />
           </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 8,
-            }}
-          >
-            <StatusDot />
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <PresenceBar me={{ name: me.name, color: me.color }} />
+            <StatusDot />
           </div>
         </header>
 
         <div
           style={{
             flex: 1,
-            borderRadius: 12,
-            border: "1px solid #232733",
-            background: "#13161d",
+            borderRadius: "var(--radius)",
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
             overflow: "hidden",
+            position: "relative",
           }}
         >
           <Canvas />
+          <p
+            style={{
+              position: "absolute",
+              left: 16,
+              bottom: 14,
+              fontSize: 12,
+              color: "var(--text-faint)",
+              pointerEvents: "none",
+            }}
+          >
+            Open this room in another tab to see live cursors.
+          </p>
         </div>
       </main>
       <Toaster />
     </FlockProvider>
+  );
+}
+
+// The shareable room id as a copyable monospace chip.
+function RoomCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    navigator.clipboard?.writeText(window.location.href).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      },
+      () => {},
+    );
+  }
+
+  return (
+    <button
+      onClick={copy}
+      title="Copy room link"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        padding: "4px 10px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        color: "var(--text-muted)",
+        fontSize: 12.5,
+        cursor: "pointer",
+        transition: "border-color 150ms, color 150ms",
+      }}
+    >
+      <span style={{ color: "var(--text-faint)" }}>room</span>
+      <code style={{ color: "var(--text)" }}>{code}</code>
+      <span style={{ color: copied ? "var(--accent)" : "var(--text-faint)" }}>
+        {copied ? "copied" : "copy link"}
+      </span>
+    </button>
   );
 }

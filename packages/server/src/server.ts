@@ -1,6 +1,7 @@
 // The presence server. Accepts WebSocket connections, routes incoming wire
 // messages, and broadcasts updates to the other people in a room.
 
+import { randomUUID } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
 import { Redis } from "ioredis";
@@ -8,6 +9,8 @@ import { createHealthServer } from "./health.js";
 import { createLogger, type Logger } from "./logger.js";
 import { RoomManager } from "./room-manager.js";
 import { PresenceStore, parsePresenceKey } from "./presence.js";
+import { PubSub } from "./pubsub.js";
+import { Broadcaster } from "./broadcast.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
@@ -68,6 +71,7 @@ export class FlockServer {
   private readonly ttlSeconds: number;
   private http?: Server;
   private wss?: WebSocketServer;
+  private readonly instanceId = randomUUID();
   private sockets = new Map<WebSocket, SocketState>();
   // Cursor moves that landed before a socket's join, held until the join
   // arrives (then replayed) or until they age out.
@@ -75,6 +79,8 @@ export class FlockServer {
   private redis?: Redis;
   private subscriber?: Redis;
   private presence?: PresenceStore;
+  private pubsub?: PubSub;
+  private broadcaster!: Broadcaster;
 
   constructor(options: FlockServerOptions = {}) {
     this.port = options.port ?? envPort() ?? 8787;
@@ -89,9 +95,15 @@ export class FlockServer {
       this.redis = new Redis(this.redisUrl, { lazyConnect: false });
       this.redis.on("error", (err) => this.log.warn({ err }, "redis error"));
       this.presence = new PresenceStore(this.redis, this.ttlSeconds);
+      this.pubsub = new PubSub(this.redis, this.instanceId);
+      this.pubsub.setRemoteHandler((roomId, msg) => {
+        this.broadcaster.sendFromRemote(roomId, msg);
+      });
       this.subscribeToExpiry();
-      this.log.info("redis presence enabled");
+      this.log.info({ instanceId: this.instanceId }, "redis presence and pub/sub enabled");
     }
+
+    this.broadcaster = new Broadcaster(this.rooms, this.pubsub);
 
     this.http = createHealthServer();
     this.wss = new WebSocketServer({ server: this.http });
@@ -130,6 +142,10 @@ export class FlockServer {
     this.pendingCursors.clear();
     await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
     await new Promise<void>((resolve) => this.http?.close(() => resolve()));
+    if (this.pubsub) {
+      await this.pubsub.close();
+      this.pubsub = undefined;
+    }
     if (this.subscriber) {
       this.subscriber.disconnect();
       this.subscriber = undefined;
@@ -175,7 +191,10 @@ export class FlockServer {
     }
 
     this.rooms.leaveRoom(roomId, userId);
-    this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
+    // Use a dummy socket for the sender since the user is no longer connected.
+    // Expired-presence evictions only need to reach local sockets; cross-instance
+    // evictions are handled by each instance receiving its own keyspace event.
+    void this.broadcaster.broadcast(roomId, userId, { type: "user:left", roomId, userId }, {} as never);
   }
 
   getRoomCount(): number {
@@ -227,7 +246,7 @@ export class FlockServer {
       const oldSocket = existingClient.socket;
       this.sockets.delete(oldSocket);
       this.log.info({ roomId, userId }, "duplicate join, evicting old connection");
-      this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
+      void this.broadcaster.broadcast(roomId, userId, { type: "user:left", roomId, userId }, oldSocket);
       oldSocket.close();
     }
 
@@ -251,15 +270,23 @@ export class FlockServer {
         .catch((err) => this.log.warn({ err }, "failed to set presence"));
     }
 
+    // Subscribe this instance to the room's pub/sub channel now that it has a
+    // local client. Safe to call if already subscribed.
+    if (this.pubsub) {
+      this.pubsub
+        .subscribeRoom(roomId)
+        .catch((err) => this.log.warn({ err }, "failed to subscribe room to pubsub"));
+    }
+
     this.send(socket, { type: "join:ack", roomId, users: existing });
 
-    // Tell everyone already in the room that someone new showed up.
-    this.broadcast(roomId, userId, {
+    // Tell everyone already in the room (including other instances) that someone new showed up.
+    void this.broadcaster.broadcast(roomId, userId, {
       type: "user:joined",
       roomId,
       userId,
       metadata,
-    });
+    }, socket);
 
     // Replay any cursor moves that arrived on this socket before the join did.
     this.flushPendingCursors(socket);
@@ -329,13 +356,13 @@ export class FlockServer {
         .catch((err) => this.log.warn({ err }, "failed to store cursor"));
     }
 
-    this.broadcast(roomId, userId, {
+    void this.broadcaster.broadcast(roomId, userId, {
       type: "cursor:updated",
       roomId,
       userId,
       position,
       timestamp: Date.now(),
-    });
+    }, socket);
   }
 
   private handleCursorLeave(socket: WebSocket): void {
@@ -351,7 +378,7 @@ export class FlockServer {
         .catch((err) => this.log.warn({ err }, "failed to clear cursor"));
     }
 
-    this.broadcast(roomId, userId, { type: "cursor:removed", roomId, userId });
+    void this.broadcaster.broadcast(roomId, userId, { type: "cursor:removed", roomId, userId }, socket);
   }
 
   // Merges a partial metadata patch into the user's stored presence and tells
@@ -373,12 +400,12 @@ export class FlockServer {
         .catch((err) => this.log.warn({ err }, "failed to update presence metadata"));
     }
 
-    this.broadcast(roomId, userId, {
+    void this.broadcaster.broadcast(roomId, userId, {
       type: "presence:updated",
       roomId,
       userId,
       metadata,
-    });
+    }, socket);
   }
 
   private handleClose(socket: WebSocket): void {
@@ -403,7 +430,7 @@ export class FlockServer {
       return;
     }
 
-    this.rooms.leaveRoom(roomId, userId);
+    const remaining = this.rooms.leaveRoom(roomId, userId);
     this.log.info({ roomId, userId }, "user left");
 
     if (this.presence) {
@@ -412,14 +439,14 @@ export class FlockServer {
         .catch((err) => this.log.warn({ err }, "failed to remove presence"));
     }
 
-    this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
-  }
+    void this.broadcaster.broadcast(roomId, userId, { type: "user:left", roomId, userId }, socket);
 
-  // Sends a message to everyone in the room except the user it came from.
-  private broadcast(roomId: string, exceptUserId: string, msg: ServerMessage): void {
-    for (const client of this.rooms.getRoomClients(roomId)) {
-      if (client.userId === exceptUserId) continue;
-      this.send(client.socket, msg);
+    // When the last local client leaves this room, stop listening on its
+    // pub/sub channel so we don't accumulate stale subscriptions.
+    if (remaining === 0 && this.pubsub) {
+      this.pubsub
+        .unsubscribeRoom(roomId)
+        .catch((err) => this.log.warn({ err }, "failed to unsubscribe room from pubsub"));
     }
   }
 

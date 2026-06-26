@@ -1,0 +1,33 @@
+# Fly.io configuration for the Flock WebSocket server.
+# Deploy with: fly deploy --config fly.toml
+
+app = "flock-server"
+primary_region = "iad"
+
+[build]
+  dockerfile = "packages/server/Dockerfile"
+  # The Dockerfile's context is the repo root so it can reach tsconfig.base.json.
+
+[http_service]
+  internal_port = 8787
+  force_https = false
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[env]
+  # FLOCK_PORT defaults to 8787; not needed unless you override it.
+  # Set secrets via `fly secrets set`, not here:
+  #   FLOCK_REDIS_URL    -> Upstash Redis connection string
+  #   FLOCK_API_KEYS     -> comma-separated valid keys (optional)
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

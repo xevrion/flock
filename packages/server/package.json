@@ -1,6 +1,6 @@
 {
   "name": "@xevrion/flock-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-hostable WebSocket presence server for Flock",
   "license": "MIT",
   "repository": {
@@ -9,7 +9,15 @@
     "directory": "packages/server"
   },
   "homepage": "https://flock.xevrion.dev",
-  "keywords": ["flock", "presence", "cursors", "multiplayer", "websocket", "server", "self-hosted"],
+  "keywords": [
+    "flock",
+    "presence",
+    "cursors",
+    "multiplayer",
+    "websocket",
+    "server",
+    "self-hosted"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -23,7 +31,9 @@
   "bin": {
     "flock-server": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

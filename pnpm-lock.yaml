@@ -83,8 +83,8 @@ importers:
         specifier: ^3.44.0
         version: 3.44.0(react@18.3.1)
       '@xevrion/flock-react':
-        specifier: workspace:*
-        version: link:../../packages/react
+        specifier: ^0.2.0
+        version: 0.2.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       fumadocs-core:
         specifier: ^14.0.0
         version: 14.7.7(@types/react@18.3.31)(next@15.5.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1522,6 +1522,15 @@ packages:
 
   '@vitest/utils@2.1.9':
     resolution: {integrity: sha512-v0psaMSkNJ3A2NMrUEHFRzJtDPFn+/VWZ5WxImB21T9fjucJRmS7xCS3ppEnARb9y11OAzaD+P2Ps+b+BGX5iQ==}
+
+  '@xevrion/flock-core@0.2.0':
+    resolution: {integrity: sha512-8lgXkvLvpB4MQtwIRZjsC+PODp531HYCKw8jLfvCFTBdH/41pg112mAdcqUO6Cd6ZRQ9lpXy6P2NvVscCpyHEw==}
+
+  '@xevrion/flock-react@0.2.0':
+    resolution: {integrity: sha512-PVrUoVjS+jVLrkgB004i6EpiNh1uiIn6ql7zcw+C0jzUacAd69RNhv3zvLYraqrag623nu9O4CvfbLvfP4s2lw==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -4190,6 +4199,14 @@ snapshots:
       '@vitest/pretty-format': 2.1.9
       loupe: 3.2.1
       tinyrainbow: 1.2.0
+
+  '@xevrion/flock-core@0.2.0': {}
+
+  '@xevrion/flock-react@0.2.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@xevrion/flock-core': 0.2.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   acorn-jsx@5.3.2(acorn@8.17.0):
     dependencies:

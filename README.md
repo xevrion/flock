@@ -80,10 +80,10 @@ Flock does one thing well: presence and live cursors. If you need document sync,
 
 ## Demos
 
-- Canvas demo: collaborative canvas with live cursors and presence bar — [demo-canvas app](apps/demo-canvas)
-- Presence widget: "who's viewing this page" widget — [demo-presence app](apps/demo-presence)
+- [Canvas demo](https://flock-demo-canvas.vercel.app) — collaborative canvas with live cursors and presence bar
+- [Presence widget](https://flock-demo-presence.vercel.app) — "who's viewing this page" widget
 
-Both demos run locally with `pnpm --filter demo-canvas dev` and `pnpm --filter demo-presence dev` after starting the server.
+Open the canvas demo in two browser tabs and share the `?room=` URL to see cursors in real time. Both demos run locally too with `pnpm --filter demo-canvas dev` and `pnpm --filter demo-presence dev` after starting the server.
 
 ## Self-hosting
 
@@ -155,7 +155,7 @@ pnpm test
 
 ## Docs
 
-Full documentation at [flock.xevrion.dev](https://flock.xevrion.dev) (deployment pending). Run locally:
+Full documentation at [flock.xevrion.dev](https://flock.xevrion.dev) (or [flock-docs.vercel.app](https://flock-docs.vercel.app)). Run locally:
 
 ```bash
 pnpm --filter docs dev

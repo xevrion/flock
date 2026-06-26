@@ -202,13 +202,10 @@ describe("FlockServer", () => {
   });
 
   it("accepts a join with a valid api key when keys are configured", async () => {
-    const s = new FlockServer({ port: PORT + 1, logger: false, apiKeys: ["secret"] });
+    const s = new FlockServer({ port: 8820, logger: false, apiKeys: ["secret"] });
     await s.start();
-    const ws = await connect();
-    // use the wrong port to avoid the existing server; connect to s instead
-    ws.close();
 
-    const ws2 = new WebSocket(`ws://localhost:${PORT + 1}`);
+    const ws2 = new WebSocket(`ws://localhost:8820`);
     const ack = await new Promise<Record<string, unknown>>((resolve, reject) => {
       ws2.on("open", () => {
         ws2.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {}, apiKey: "secret" }));
@@ -226,10 +223,10 @@ describe("FlockServer", () => {
   });
 
   it("rejects a join with a bad api key and closes the socket", async () => {
-    const s = new FlockServer({ port: PORT + 2, logger: false, apiKeys: ["secret"] });
+    const s = new FlockServer({ port: 8821, logger: false, apiKeys: ["secret"] });
     await s.start();
 
-    const ws = new WebSocket(`ws://localhost:${PORT + 2}`);
+    const ws = new WebSocket(`ws://localhost:8821`);
     const result = await new Promise<{ type: string; closed: boolean }>((resolve) => {
       let type = "";
       ws.on("open", () => {
@@ -252,6 +249,33 @@ describe("FlockServer", () => {
     const ack = await waitFor(a, "join:ack");
     expect(ack.type).toBe("join:ack");
     a.close();
+  });
+
+  it("closes a connection that sends too many messages", async () => {
+    // Use a low limit so we don't need to send hundreds of messages in the test.
+    const s = new FlockServer({ port: 8822, logger: false, maxMessagesPerSecond: 5 });
+    await s.start();
+
+    const ws = new WebSocket("ws://localhost:8822");
+    let errorReceived = false;
+
+    const closed = new Promise<void>((resolve) => ws.on("close", () => resolve()));
+    ws.on("message", (d: Buffer) => {
+      const msg = JSON.parse(d.toString()) as Record<string, unknown>;
+      if (msg.type === "error" && msg.code === "RATE_LIMITED") {
+        errorReceived = true;
+      }
+    });
+
+    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
+    // Flood with 10 messages to exceed the limit of 5/sec.
+    for (let i = 0; i < 10; i++) {
+      ws.send(JSON.stringify({ type: "heartbeat", roomId: "r" }));
+    }
+
+    await closed;
+    expect(errorReceived).toBe(true);
+    await s.stop();
   });
 
   it("relays cursor moves to other members", async () => {

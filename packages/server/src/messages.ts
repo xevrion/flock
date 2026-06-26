@@ -119,7 +119,7 @@ export interface PresenceUpdatedMessage {
 // Sent when the server rejects a request (bad API key, full room, etc.).
 export interface ErrorMessage {
   type: "error";
-  code: "INVALID_API_KEY" | "ROOM_FULL" | "INTERNAL_ERROR";
+  code: "INVALID_API_KEY" | "ROOM_FULL" | "INTERNAL_ERROR" | "RATE_LIMITED";
   message: string;
 }
 

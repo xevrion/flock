@@ -15,11 +15,35 @@ import { validateApiKey } from "./api-key.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
+const DEFAULT_MAX_MESSAGES_PER_SECOND = 100;
+
+// Sliding-window rate limiter. Tracks incoming-message timestamps for a socket
+// and returns true when the limit is exceeded.
+class RateLimiter {
+  private readonly limit: number;
+  private readonly timestamps: number[] = [];
+
+  constructor(limit: number) {
+    this.limit = limit;
+  }
+
+  // Returns true if this message would exceed the per-second limit.
+  check(now = Date.now()): boolean {
+    const windowStart = now - 1000;
+    // Drop timestamps older than the 1-second window.
+    while (this.timestamps.length > 0 && this.timestamps[0]! <= windowStart) {
+      this.timestamps.shift();
+    }
+    this.timestamps.push(now);
+    return this.timestamps.length > this.limit;
+  }
+}
 
 export interface FlockServerOptions {
   port?: number;
   redisUrl?: string;
   apiKeys?: string[];
+  maxMessagesPerSecond?: number;
   presence?: {
     ttlSeconds?: number;
     heartbeatIntervalMs?: number;
@@ -71,6 +95,7 @@ export class FlockServer {
   private readonly redisUrl?: string;
   private readonly ttlSeconds: number;
   private readonly apiKeys?: string[];
+  private readonly maxMessagesPerSecond: number;
   private http?: Server;
   private wss?: WebSocketServer;
   private readonly instanceId = randomUUID();
@@ -78,6 +103,7 @@ export class FlockServer {
   // Cursor moves that landed before a socket's join, held until the join
   // arrives (then replayed) or until they age out.
   private pendingCursors = new Map<WebSocket, BufferedCursor>();
+  private rateLimiters = new Map<WebSocket, RateLimiter>();
   private redis?: Redis;
   private subscriber?: Redis;
   private presence?: PresenceStore;
@@ -91,6 +117,8 @@ export class FlockServer {
     this.ttlSeconds =
       options.presence?.ttlSeconds ?? envTtlSeconds() ?? DEFAULT_TTL_SECONDS;
     this.apiKeys = options.apiKeys ?? process.env.FLOCK_API_KEYS?.split(",").map((k) => k.trim()).filter(Boolean);
+    const envMaxMps = process.env.FLOCK_MAX_MESSAGES_PER_SECOND;
+    this.maxMessagesPerSecond = options.maxMessagesPerSecond ?? (envMaxMps ? Number(envMaxMps) : DEFAULT_MAX_MESSAGES_PER_SECOND);
   }
 
   start(): Promise<void> {
@@ -113,9 +141,22 @@ export class FlockServer {
 
     this.wss.on("connection", (socket) => {
       this.sockets.set(socket, {});
+      this.rateLimiters.set(socket, new RateLimiter(this.maxMessagesPerSecond));
       this.log.info("client connected");
 
       socket.on("message", (data) => {
+        const limiter = this.rateLimiters.get(socket);
+        if (limiter && limiter.check()) {
+          this.log.warn("rate limit exceeded, closing connection");
+          this.send(socket, {
+            type: "error",
+            code: "RATE_LIMITED",
+            message: "too many messages, slow down",
+          });
+          socket.close();
+          return;
+        }
+
         let msg: ClientMessage;
         try {
           msg = JSON.parse(data.toString()) as ClientMessage;
@@ -141,6 +182,7 @@ export class FlockServer {
   async stop(): Promise<void> {
     for (const socket of this.sockets.keys()) socket.close();
     this.sockets.clear();
+    this.rateLimiters.clear();
     for (const pending of this.pendingCursors.values()) clearTimeout(pending.timer);
     this.pendingCursors.clear();
     await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
@@ -423,6 +465,8 @@ export class FlockServer {
   }
 
   private handleClose(socket: WebSocket): void {
+    this.rateLimiters.delete(socket);
+
     const pending = this.pendingCursors.get(socket);
     if (pending) {
       clearTimeout(pending.timer);

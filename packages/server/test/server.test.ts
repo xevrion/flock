@@ -130,6 +130,77 @@ describe("FlockServer", () => {
     b2.close();
   });
 
+  it("evicts an old connection when the same user joins again", async () => {
+    const watcher = await connect();
+    watcher.send(JSON.stringify({ type: "join", roomId: "r", userId: "w", metadata: {} }));
+    await waitFor(watcher, "join:ack");
+
+    // b joins, then re-joins on a brand new socket (e.g. a duplicate tab). The
+    // old socket should be evicted: the room sees user:left, then user:joined.
+    const b1 = await connect();
+    b1.send(JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: {} }));
+    await waitFor(watcher, "user:joined");
+
+    const oldClosed = new Promise<void>((resolve) => b1.on("close", () => resolve()));
+    const left = waitFor(watcher, "user:left");
+    const rejoined = waitFor(watcher, "user:joined");
+
+    const b2 = await connect();
+    b2.send(JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: {} }));
+
+    expect((await left).userId).toBe("b");
+    expect((await rejoined).userId).toBe("b");
+    await oldClosed; // the stale socket was actually closed
+
+    watcher.close();
+    b2.close();
+  });
+
+  it("buffers cursor moves that arrive before the join and replays them", async () => {
+    const a = await connect();
+    a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));
+    await waitFor(a, "join:ack");
+
+    const updated = waitFor(a, "cursor:updated");
+
+    // b sends a cursor move before its join. The server should hold it and only
+    // relay it once b's join is processed.
+    const b = await connect();
+    b.send(JSON.stringify({ type: "cursor:move", roomId: "r", position: { x: 0.7, y: 0.3 } }));
+    b.send(JSON.stringify({ type: "join", roomId: "r", userId: "b", metadata: {} }));
+
+    const msg = await updated;
+    expect(msg.userId).toBe("b");
+    expect(msg.position).toEqual({ x: 0.7, y: 0.3 });
+
+    a.close();
+    b.close();
+  });
+
+  it("drops buffered cursor moves if the join never arrives", async () => {
+    const a = await connect();
+    a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));
+    await waitFor(a, "join:ack");
+
+    // b sends a cursor move but never joins. After the buffer window, a late
+    // join carrying no prior cursor should not replay the stale position.
+    const b = await connect();
+    b.send(JSON.stringify({ type: "cursor:move", roomId: "r", position: { x: 0.9, y: 0.9 } }));
+
+    const sawStale = new Promise<boolean>((resolve) => {
+      a.on("message", (data: Buffer) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "cursor:updated") resolve(true);
+      });
+      setTimeout(() => resolve(false), 700);
+    });
+
+    expect(await sawStale).toBe(false);
+
+    a.close();
+    b.close();
+  });
+
   it("relays cursor moves to other members", async () => {
     const a = await connect();
     a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));

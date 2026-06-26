@@ -1,6 +1,6 @@
 "use client";
 
-import { FlockProvider } from "@flock-sdk/react";
+import { FlockProvider } from "@xevrion/flock-react";
 import { useMemo } from "react";
 import { ViewerWidget } from "./components/ViewerWidget";
 

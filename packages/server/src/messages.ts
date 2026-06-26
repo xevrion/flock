@@ -1,4 +1,4 @@
-// Wire message types, kept identical to the client's copy in @flock-sdk/core so
+// Wire message types, kept identical to the client's copy in @xevrion/flock-core so
 // both ends agree on the protocol. Defined independently (no import from core)
 // to keep the two packages free of any runtime dependency on each other.
 

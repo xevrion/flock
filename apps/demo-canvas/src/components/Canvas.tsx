@@ -7,7 +7,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCursors, useRoom } from "@flock-sdk/react";
+import { useCursors, useRoom } from "@xevrion/flock-react";
 import { Cursor } from "./Cursor";
 
 export function Canvas() {

@@ -2,8 +2,8 @@
 // the hooks can use them. Tears the connection down when it unmounts.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FlockClient } from "@flock-sdk/core";
-import type { FlockClientOptions, FlockRoom, RoomOptions } from "@flock-sdk/core";
+import { FlockClient } from "@xevrion/flock-core";
+import type { FlockClientOptions, FlockRoom, RoomOptions } from "@xevrion/flock-core";
 import { FlockContext, type FlockContextValue } from "./context.js";
 
 export interface FlockProviderProps extends FlockClientOptions, RoomOptions {

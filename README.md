@@ -2,9 +2,9 @@
 
 Real-time multiplayer presence and live cursors for any web app — in 10 lines of code.
 
-[![npm](https://img.shields.io/npm/v/@flock-sdk/core?label=%40flock-sdk%2Fcore)](https://www.npmjs.com/package/@flock-sdk/core)
-[![npm](https://img.shields.io/npm/v/@flock-sdk/react?label=%40flock-sdk%2Freact)](https://www.npmjs.com/package/@flock-sdk/react)
-[![npm](https://img.shields.io/npm/v/@flock-sdk/server?label=%40flock-sdk%2Fserver)](https://www.npmjs.com/package/@flock-sdk/server)
+[![npm](https://img.shields.io/npm/v/@xevrion/flock-core?label=%40flock-sdk%2Fcore)](https://www.npmjs.com/package/@xevrion/flock-core)
+[![npm](https://img.shields.io/npm/v/@xevrion/flock-react?label=%40flock-sdk%2Freact)](https://www.npmjs.com/package/@xevrion/flock-react)
+[![npm](https://img.shields.io/npm/v/@xevrion/flock-server?label=%40flock-sdk%2Fserver)](https://www.npmjs.com/package/@xevrion/flock-server)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/xevrion/flock/actions/workflows/ci.yml/badge.svg)](https://github.com/xevrion/flock/actions/workflows/ci.yml)
 
@@ -13,19 +13,19 @@ Real-time multiplayer presence and live cursors for any web app — in 10 lines 
      with live cursors moving in sync. Save as demo.gif and replace this comment with:
      ![Flock demo](./demo.gif) -->
 
-**Bundle sizes:** `@flock-sdk/core` ~6KB gzipped · `@flock-sdk/react` ~3KB gzipped
+**Bundle sizes:** `@xevrion/flock-core` ~6KB gzipped · `@xevrion/flock-react` ~3KB gzipped
 
 ## Install
 
 ```bash
-npm install @flock-sdk/react
-npx @flock-sdk/server
+npm install @xevrion/flock-react
+npx @xevrion/flock-server
 ```
 
 ## Quickstart
 
 ```tsx
-import { FlockProvider, useCursors, usePresence } from "@flock-sdk/react";
+import { FlockProvider, useCursors, usePresence } from "@xevrion/flock-react";
 
 function CursorOverlay() {
   const cursors = useCursors();
@@ -96,12 +96,12 @@ docker run -p 8787:8787 \
 
 ```bash
 # npx (quickest for local dev)
-npx @flock-sdk/server
+npx @xevrion/flock-server
 ```
 
 ```bash
 # Programmatic (embed in an existing Node server)
-import { FlockServer } from "@flock-sdk/server";
+import { FlockServer } from "@xevrion/flock-server";
 const server = new FlockServer({ port: 8787, redisUrl: process.env.REDIS_URL });
 await server.start();
 ```
@@ -121,9 +121,9 @@ await server.start();
 
 | Package | Description |
 |---|---|
-| `@flock-sdk/core` | Framework-agnostic WebSocket transport, cursor throttling and interpolation, reconnection with exponential backoff |
-| `@flock-sdk/react` | React hooks: `usePresence`, `useCursors`, `useMyPresence`, `useConnectionStatus`, `useRoom` |
-| `@flock-sdk/server` | Node.js WebSocket server with Redis-backed presence TTL and pub/sub fan-out |
+| `@xevrion/flock-core` | Framework-agnostic WebSocket transport, cursor throttling and interpolation, reconnection with exponential backoff |
+| `@xevrion/flock-react` | React hooks: `usePresence`, `useCursors`, `useMyPresence`, `useConnectionStatus`, `useRoom` |
+| `@xevrion/flock-server` | Node.js WebSocket server with Redis-backed presence TTL and pub/sub fan-out |
 
 ## Run locally
 

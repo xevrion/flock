@@ -5,7 +5,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRoom } from "@flock-sdk/react";
+import { useRoom } from "@xevrion/flock-react";
 
 interface Toast {
   id: number;

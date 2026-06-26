@@ -2,7 +2,7 @@
 // the UI can show connecting, reconnecting, or error states.
 
 import { useContext, useEffect, useState } from "react";
-import type { ConnectionStatus } from "@flock-sdk/core";
+import type { ConnectionStatus } from "@xevrion/flock-core";
 import { FlockContext } from "../context.js";
 
 export function useConnectionStatus(): ConnectionStatus {

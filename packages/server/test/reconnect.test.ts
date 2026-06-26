@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { FlockServer } from "../src/server.js";
-import { FlockClient } from "@flock-sdk/core";
+import { FlockClient } from "@xevrion/flock-core";
 
 // The core client uses the global WebSocket, which node doesn't provide.
 (globalThis as { WebSocket: unknown }).WebSocket = WebSocket;

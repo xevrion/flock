@@ -1,12 +1,12 @@
 ---
 title: FlockClient
-description: The main entry point for the @flock-sdk/core package. Manages the WebSocket connection and room membership.
+description: The main entry point for the @xevrion/flock-core package. Manages the WebSocket connection and room membership.
 ---
 
 `FlockClient` manages a single WebSocket connection to the Flock server and lets you join multiple rooms on that connection.
 
 ```ts
-import { FlockClient } from "@flock-sdk/core";
+import { FlockClient } from "@xevrion/flock-core";
 
 const client = new FlockClient({
   serverUrl: "wss://your-flock-server.com",

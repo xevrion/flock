@@ -44,9 +44,9 @@ Open http://localhost:3100 in two tabs.
 ## Project layout
 
 ```
-packages/core/      @flock-sdk/core — browser WebSocket transport, room state, reconnection
-packages/react/     @flock-sdk/react — React hooks and context provider
-packages/server/    @flock-sdk/server — Node.js WebSocket server with Redis
+packages/core/      @xevrion/flock-core — browser WebSocket transport, room state, reconnection
+packages/react/     @xevrion/flock-react — React hooks and context provider
+packages/server/    @xevrion/flock-server — Node.js WebSocket server with Redis
 apps/demo-canvas/   Collaborative canvas demo app
 apps/demo-presence/ "Who's viewing this page" presence widget demo
 apps/docs/          Documentation site (Next.js + Fumadocs)

@@ -13,7 +13,7 @@ The `apps/demo-presence` app in the monorepo is a standalone Next.js app with th
 // ViewerWidget.tsx
 "use client";
 
-import { usePresence, useMyPresence } from "@flock-sdk/react";
+import { usePresence, useMyPresence } from "@xevrion/flock-react";
 
 function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -68,7 +68,7 @@ export function ViewerWidget() {
 
 ```tsx
 // page.tsx
-import { FlockProvider } from "@flock-sdk/react";
+import { FlockProvider } from "@xevrion/flock-react";
 import { ViewerWidget } from "./ViewerWidget";
 
 export default function Page() {

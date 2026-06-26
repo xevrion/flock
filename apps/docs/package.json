@@ -8,7 +8,7 @@
     "start": "next start --port 3200"
   },
   "dependencies": {
-    "@flock-sdk/react": "workspace:*",
+    "@xevrion/flock-react": "workspace:*",
     "fumadocs-core": "^14.0.0",
     "fumadocs-mdx": "^11.0.0",
     "fumadocs-ui": "^14.0.0",

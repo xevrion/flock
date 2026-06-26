@@ -1,5 +1,5 @@
 {
-  "name": "@flock-sdk/react",
+  "name": "@xevrion/flock-react",
   "version": "0.1.0",
   "description": "React hooks adapter for Flock real-time presence & cursors",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@flock-sdk/core": "workspace:^"
+    "@xevrion/flock-core": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

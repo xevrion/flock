@@ -1,6 +1,6 @@
 "use client";
 
-import { usePresence, useMyPresence } from "@flock-sdk/react";
+import { usePresence, useMyPresence } from "@xevrion/flock-react";
 
 function initials(name: string) {
   return name

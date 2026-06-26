@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Flock — Who's Here",
-  description: "Minimal presence widget demo using @flock-sdk/react",
+  description: "Minimal presence widget demo using @xevrion/flock-react",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

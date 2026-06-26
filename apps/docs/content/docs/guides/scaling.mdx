@@ -37,10 +37,10 @@ Set `FLOCK_REDIS_URL` on all instances. That's it.
 
 ```bash
 # Instance 1
-FLOCK_PORT=8787 FLOCK_REDIS_URL=redis://your-redis:6379 npx @flock-sdk/server
+FLOCK_PORT=8787 FLOCK_REDIS_URL=redis://your-redis:6379 npx @xevrion/flock-server
 
 # Instance 2 (same Redis, different port or machine)
-FLOCK_PORT=8788 FLOCK_REDIS_URL=redis://your-redis:6379 npx @flock-sdk/server
+FLOCK_PORT=8788 FLOCK_REDIS_URL=redis://your-redis:6379 npx @xevrion/flock-server
 ```
 
 ## WebSocket stickiness

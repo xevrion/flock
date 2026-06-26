@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FlockProvider } from "@flock-sdk/react";
+import { FlockProvider } from "@xevrion/flock-react";
 import { Canvas } from "@/components/Canvas";
 import { PresenceBar } from "@/components/PresenceBar";
 import { StatusDot } from "@/components/StatusDot";

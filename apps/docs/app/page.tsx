@@ -69,8 +69,8 @@ export default function HomePage() {
           color: "#333",
         }}
       >
-        {`npm install @flock-sdk/react
-npx @flock-sdk/server`}
+        {`npm install @xevrion/flock-react
+npx @xevrion/flock-server`}
       </pre>
 
       <p style={{ color: "#999", fontSize: "0.85rem", margin: 0 }}>

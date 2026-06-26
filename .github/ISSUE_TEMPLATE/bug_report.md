@@ -20,7 +20,7 @@ What should have happened?
 
 ## Environment
 
-- Package(s) affected: `@flock-sdk/core` / `@flock-sdk/react` / `@flock-sdk/server`
+- Package(s) affected: `@xevrion/flock-core` / `@xevrion/flock-react` / `@xevrion/flock-server`
 - Version:
 - Node.js version:
 - Browser (if client-side):

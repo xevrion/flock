@@ -4,7 +4,7 @@ A by-hand check that the client silently rides out a network drop and resumes
 sharing cursors, with the connection status indicator reflecting the outage.
 
 There is also an automated version of this in
-`packages/server/test/reconnect.test.ts` (run with `pnpm --filter @flock-sdk/server test`)
+`packages/server/test/reconnect.test.ts` (run with `pnpm --filter @xevrion/flock-server test`)
 that drives a real `FlockClient` through a server stop/restart and asserts the
 status transitions and clean re-join. This document is the visual two-tab check.
 
@@ -13,7 +13,7 @@ status transitions and clean re-join. This document is the visual two-tab check.
 1. Build the packages so the playground's import resolves:
 
    ```
-   pnpm --filter @flock-sdk/core build
+   pnpm --filter @xevrion/flock-core build
    ```
 
 2. Start the Flock server:

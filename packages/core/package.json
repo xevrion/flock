@@ -1,5 +1,5 @@
 {
-  "name": "@flock-sdk/core",
+  "name": "@xevrion/flock-core",
   "version": "0.1.0",
   "description": "Framework-agnostic real-time presence & cursor transport for Flock",
   "license": "MIT",

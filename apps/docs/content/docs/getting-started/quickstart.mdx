@@ -8,7 +8,7 @@ description: Add live cursors to your React app in under 5 minutes.
 The Flock server handles all the WebSocket connections. Run it locally with npx (no install needed):
 
 ```bash
-npx @flock-sdk/server
+npx @xevrion/flock-server
 ```
 
 Or with Docker:
@@ -28,7 +28,7 @@ flock server starting
 ## 2. Install the React package
 
 ```bash
-npm install @flock-sdk/react
+npm install @xevrion/flock-react
 ```
 
 ## 3. Add cursors to your app
@@ -36,7 +36,7 @@ npm install @flock-sdk/react
 Wrap your app (or just the page that needs cursors) in `<FlockProvider>`, then call `useCursors()` to render other users' cursor positions:
 
 ```tsx
-import { FlockProvider, useCursors } from "@flock-sdk/react";
+import { FlockProvider, useCursors } from "@xevrion/flock-react";
 
 function CursorOverlay() {
   const cursors = useCursors();
@@ -83,7 +83,7 @@ By default, Flock tracks the mouse relative to the viewport and normalizes posit
 To track within a specific element (like a canvas):
 
 ```tsx
-import { useRoom } from "@flock-sdk/react";
+import { useRoom } from "@xevrion/flock-react";
 import { useEffect, useRef } from "react";
 
 function Canvas() {
@@ -114,7 +114,7 @@ Open this page in two browser tabs and move your mouse in the area below:
 
 <LiveDemo />
 
-If the demo shows "Server not available", start the server locally first (`npx @flock-sdk/server`) and set `NEXT_PUBLIC_FLOCK_SERVER_URL=ws://localhost:8787` in `apps/docs/.env.local`.
+If the demo shows "Server not available", start the server locally first (`npx @xevrion/flock-server`) and set `NEXT_PUBLIC_FLOCK_SERVER_URL=ws://localhost:8787` in `apps/docs/.env.local`.
 
 ## Next steps
 

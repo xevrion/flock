@@ -2,7 +2,7 @@
 // re-renders as people join and leave.
 
 import { useContext, useEffect, useState } from "react";
-import type { PresenceUser } from "@flock-sdk/core";
+import type { PresenceUser } from "@xevrion/flock-core";
 import { FlockContext } from "../context.js";
 
 export function usePresence(): PresenceUser[] {

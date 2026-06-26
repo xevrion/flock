@@ -22,7 +22,7 @@ You should receive an acknowledgment within 48 hours. Once the issue is confirme
 
 Issues in the following areas are in scope:
 
-- `@flock-sdk/server` — authentication bypass, remote code execution, privilege escalation, denial-of-service vectors that affect all users
-- `@flock-sdk/core` / `@flock-sdk/react` — XSS risks from improperly handled server messages, data leakage across rooms
+- `@xevrion/flock-server` — authentication bypass, remote code execution, privilege escalation, denial-of-service vectors that affect all users
+- `@xevrion/flock-core` / `@xevrion/flock-react` — XSS risks from improperly handled server messages, data leakage across rooms
 
 Self-hosted deployments that are misconfigured (for example, running without API key auth and exposing the server publicly) are out of scope, as the risk is to the operator's own data.

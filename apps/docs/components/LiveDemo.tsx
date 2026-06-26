@@ -1,6 +1,6 @@
 "use client";
 
-import { FlockProvider, useCursors, usePresence, useConnectionStatus } from "@flock-sdk/react";
+import { FlockProvider, useCursors, usePresence, useConnectionStatus } from "@xevrion/flock-react";
 import { useEffect, useRef, useState } from "react";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_FLOCK_SERVER_URL ?? "";
@@ -55,7 +55,7 @@ function DemoInner() {
             ? "Move your mouse in here"
             : status === "connecting" || status === "reconnecting"
             ? "Connecting..."
-            : "Server not available — start it locally with: npx @flock-sdk/server"}
+            : "Server not available — start it locally with: npx @xevrion/flock-server"}
         </div>
 
         {Object.values(cursors).map((cursor) => {
@@ -134,7 +134,7 @@ export function LiveDemo() {
         <strong style={{ color: "#fff" }}>Live demo not configured.</strong>
         {" "}Start the server locally with{" "}
         <code style={{ background: "#1a1a1a", padding: "1px 4px", borderRadius: 3 }}>
-          npx @flock-sdk/server
+          npx @xevrion/flock-server
         </code>{" "}
         and set{" "}
         <code style={{ background: "#1a1a1a", padding: "1px 4px", borderRadius: 3 }}>

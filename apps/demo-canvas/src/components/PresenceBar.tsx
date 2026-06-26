@@ -4,7 +4,7 @@
 
 "use client";
 
-import { usePresence } from "@flock-sdk/react";
+import { usePresence } from "@xevrion/flock-react";
 
 interface PresenceBarProps {
   me: { name: string; color: string };

@@ -6,11 +6,11 @@ description: Install Flock in your project and choose a server hosting path.
 ## Client packages
 
 ```bash
-# React adapter (includes @flock-sdk/core as a dependency)
-npm install @flock-sdk/react
+# React adapter (includes @xevrion/flock-core as a dependency)
+npm install @xevrion/flock-react
 
 # Framework-agnostic core only
-npm install @flock-sdk/core
+npm install @xevrion/flock-core
 ```
 
 ## Server options
@@ -20,7 +20,7 @@ npm install @flock-sdk/core
 No install needed. Just run:
 
 ```bash
-npx @flock-sdk/server
+npx @xevrion/flock-server
 ```
 
 Environment variables:
@@ -49,7 +49,7 @@ docker run -p 8787:8787 \
 ### Option 3: Programmatic (embed in an existing Node server)
 
 ```ts
-import { FlockServer } from "@flock-sdk/server";
+import { FlockServer } from "@xevrion/flock-server";
 
 const server = new FlockServer({
   port: 8787,
@@ -62,4 +62,4 @@ await server.start();
 ## Requirements
 
 - Node.js 22 or later
-- React 18+ (for `@flock-sdk/react`)
+- React 18+ (for `@xevrion/flock-react`)

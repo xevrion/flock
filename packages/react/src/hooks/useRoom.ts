@@ -2,7 +2,7 @@
 // don't cover (custom event handling, imperative calls).
 
 import { useContext } from "react";
-import type { FlockRoom } from "@flock-sdk/core";
+import type { FlockRoom } from "@xevrion/flock-core";
 import { FlockContext } from "../context.js";
 
 export function useRoom(): FlockRoom {

@@ -1,5 +1,5 @@
 {
-  "name": "@flock-sdk/server",
+  "name": "@xevrion/flock-server",
   "version": "0.1.0",
   "description": "Self-hostable WebSocket presence server for Flock",
   "license": "MIT",
@@ -37,7 +37,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@flock-sdk/core": "workspace:*",
+    "@xevrion/flock-core": "workspace:*",
     "@types/ws": "^8.5.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

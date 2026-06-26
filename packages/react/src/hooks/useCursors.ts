@@ -9,8 +9,8 @@
 // received positions are returned as-is.
 
 import { useContext, useEffect, useRef, useState } from "react";
-import { createInterpolator } from "@flock-sdk/core";
-import type { UserId, UserCursor } from "@flock-sdk/core";
+import { createInterpolator } from "@xevrion/flock-core";
+import type { UserId, UserCursor } from "@xevrion/flock-core";
 import { FlockContext } from "../context.js";
 
 export function useCursors(): Record<UserId, UserCursor> {

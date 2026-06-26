@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Command-line entry point. Reads config from environment variables and starts
-// a FlockServer, so it can run via `npx @flock-sdk/server`.
+// a FlockServer, so it can run via `npx @xevrion/flock-server`.
 
 import { FlockServer } from "./server.js";
 

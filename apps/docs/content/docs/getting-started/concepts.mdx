@@ -59,21 +59,21 @@ function Cursors() {
 ## How the packages relate
 
 ```
-@flock-sdk/server          @flock-sdk/core
+@xevrion/flock-server          @xevrion/flock-core
 (WebSocket server)  <-->   (browser client)
                                ^
                                | wraps
-                           @flock-sdk/react
+                           @xevrion/flock-react
                            (React hooks)
 ```
 
-- **`@flock-sdk/server`** runs on your server (Node.js, Docker, or npx). It receives messages from clients and fans them out to others in the same room. It can optionally use Redis for multi-instance horizontal scaling.
-- **`@flock-sdk/core`** is the browser client. It manages the WebSocket connection, reconnection, heartbeats, and room state. No React required — you can use it in any framework.
-- **`@flock-sdk/react`** wraps `@flock-sdk/core` in React hooks and context. Use `<FlockProvider>` once, then call `useCursors()`, `usePresence()`, and `useMyPresence()` anywhere in the tree.
+- **`@xevrion/flock-server`** runs on your server (Node.js, Docker, or npx). It receives messages from clients and fans them out to others in the same room. It can optionally use Redis for multi-instance horizontal scaling.
+- **`@xevrion/flock-core`** is the browser client. It manages the WebSocket connection, reconnection, heartbeats, and room state. No React required — you can use it in any framework.
+- **`@xevrion/flock-react`** wraps `@xevrion/flock-core` in React hooks and context. Use `<FlockProvider>` once, then call `useCursors()`, `usePresence()`, and `useMyPresence()` anywhere in the tree.
 
 ## Why split into three packages?
 
 The split keeps bundle sizes small and lets you use only what you need:
-- A vanilla JS app uses just `@flock-sdk/core` (under 10KB gzipped)
-- A React app adds `@flock-sdk/react` (under 5KB gzipped on top)
+- A vanilla JS app uses just `@xevrion/flock-core` (under 10KB gzipped)
+- A React app adds `@xevrion/flock-react` (under 5KB gzipped on top)
 - The server package is never included in the browser bundle

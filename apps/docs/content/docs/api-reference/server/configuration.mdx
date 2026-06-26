@@ -3,7 +3,7 @@ title: Configuration
 description: Environment variables for running the Flock server via npx or Docker.
 ---
 
-When running the Flock server via `npx @flock-sdk/server` or Docker, all configuration is done through environment variables.
+When running the Flock server via `npx @xevrion/flock-server` or Docker, all configuration is done through environment variables.
 
 ## Environment variables
 
@@ -22,7 +22,7 @@ When running the Flock server via `npx @flock-sdk/server` or Docker, all configu
 ### Local development (no Redis, no auth)
 
 ```bash
-npx @flock-sdk/server
+npx @xevrion/flock-server
 ```
 
 ### With Redis and API key authentication
@@ -30,7 +30,7 @@ npx @flock-sdk/server
 ```bash
 FLOCK_REDIS_URL=redis://localhost:6379 \
 FLOCK_API_KEYS=mykey1,mykey2 \
-npx @flock-sdk/server
+npx @xevrion/flock-server
 ```
 
 ### Docker with environment variables

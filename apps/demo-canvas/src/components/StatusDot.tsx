@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useConnectionStatus } from "@flock-sdk/react";
+import { useConnectionStatus } from "@xevrion/flock-react";
 
 const STATES: Record<string, { color: string; label: string; pulse: boolean }> = {
   connected: { color: "var(--accent)", label: "Live", pulse: false },

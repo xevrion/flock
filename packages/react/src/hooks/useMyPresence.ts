@@ -2,7 +2,7 @@
 // updates to the rest of the room.
 
 import { useCallback, useContext, useState } from "react";
-import type { UserMetadata } from "@flock-sdk/core";
+import type { UserMetadata } from "@xevrion/flock-core";
 import { FlockContext } from "../context.js";
 
 export function useMyPresence(): [UserMetadata, (update: Partial<UserMetadata>) => void] {

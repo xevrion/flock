@@ -48,6 +48,18 @@ interface SocketState {
   userId?: string;
 }
 
+// How many cursor moves we'll hold for a socket that hasn't sent its join yet,
+// and how long we'll keep them before giving up on the join arriving.
+const MAX_BUFFERED_CURSOR_MOVES = 3;
+const CURSOR_BUFFER_TTL_MS = 500;
+
+// A cursor move that arrived before the join did, plus the timer that drops it
+// if the join never shows up.
+interface BufferedCursor {
+  positions: Array<{ x: number; y: number }>;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class FlockServer {
   private readonly port: number;
   private readonly log: Logger;
@@ -57,6 +69,9 @@ export class FlockServer {
   private http?: Server;
   private wss?: WebSocketServer;
   private sockets = new Map<WebSocket, SocketState>();
+  // Cursor moves that landed before a socket's join, held until the join
+  // arrives (then replayed) or until they age out.
+  private pendingCursors = new Map<WebSocket, BufferedCursor>();
   private redis?: Redis;
   private subscriber?: Redis;
   private presence?: PresenceStore;
@@ -111,6 +126,8 @@ export class FlockServer {
   async stop(): Promise<void> {
     for (const socket of this.sockets.keys()) socket.close();
     this.sockets.clear();
+    for (const pending of this.pendingCursors.values()) clearTimeout(pending.timer);
+    this.pendingCursors.clear();
     await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
     await new Promise<void>((resolve) => this.http?.close(() => resolve()));
     if (this.subscriber) {
@@ -200,12 +217,29 @@ export class FlockServer {
   ): void {
     const { roomId, userId, metadata } = msg;
 
+    // If this userId is already in the room on a different socket (a duplicate
+    // tab or a refresh that beat the old socket's close), evict the old one
+    // first: close its socket and tell the room it left, then treat this as a
+    // clean re-join. We drop the old socket's state so its own close event
+    // becomes a no-op and doesn't fire a second user:left.
+    const existingClient = this.rooms.getClient(roomId, userId);
+    if (existingClient && existingClient.socket !== socket) {
+      const oldSocket = existingClient.socket;
+      this.sockets.delete(oldSocket);
+      this.log.info({ roomId, userId }, "duplicate join, evicting old connection");
+      this.broadcast(roomId, userId, { type: "user:left", roomId, userId });
+      oldSocket.close();
+    }
+
     // Snapshot of everyone already here, sent back to the new joiner.
-    const existing = this.rooms.getRoomClients(roomId).map((c) => ({
-      userId: c.userId,
-      metadata: c.metadata,
-      cursor: c.cursor,
-    }));
+    const existing = this.rooms
+      .getRoomClients(roomId)
+      .filter((c) => c.userId !== userId)
+      .map((c) => ({
+        userId: c.userId,
+        metadata: c.metadata,
+        cursor: c.cursor,
+      }));
 
     this.rooms.joinRoom(roomId, userId, metadata, socket);
     this.sockets.set(socket, { roomId, userId });
@@ -226,6 +260,39 @@ export class FlockServer {
       userId,
       metadata,
     });
+
+    // Replay any cursor moves that arrived on this socket before the join did.
+    this.flushPendingCursors(socket);
+  }
+
+  // Sends any cursor moves that were buffered for a socket while it was waiting
+  // to join, then clears the buffer.
+  private flushPendingCursors(socket: WebSocket): void {
+    const pending = this.pendingCursors.get(socket);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pendingCursors.delete(socket);
+    for (const position of pending.positions) {
+      this.handleCursorMove(socket, position);
+    }
+  }
+
+  // Holds a cursor move for a socket that hasn't joined yet. We keep at most a
+  // few of the most recent positions and drop the whole buffer if the join
+  // doesn't arrive in time.
+  private bufferCursorMove(socket: WebSocket, position: { x: number; y: number }): void {
+    let pending = this.pendingCursors.get(socket);
+    if (!pending) {
+      const timer = setTimeout(() => {
+        this.pendingCursors.delete(socket);
+      }, CURSOR_BUFFER_TTL_MS);
+      pending = { positions: [], timer };
+      this.pendingCursors.set(socket, pending);
+    }
+    pending.positions.push(position);
+    if (pending.positions.length > MAX_BUFFERED_CURSOR_MOVES) {
+      pending.positions.shift();
+    }
   }
 
   // Keeps a user's presence alive in Redis and acknowledges so the client knows
@@ -246,7 +313,12 @@ export class FlockServer {
 
   private handleCursorMove(socket: WebSocket, position: { x: number; y: number }): void {
     const { roomId, userId } = this.sockets.get(socket) ?? {};
-    if (!roomId || !userId) return;
+    if (!roomId || !userId) {
+      // The cursor beat the join over the wire. Hold a few moves so we don't
+      // lose the user's position in that race, and replay them once they join.
+      this.bufferCursorMove(socket, position);
+      return;
+    }
 
     const client = this.rooms.getClient(roomId, userId);
     if (client) client.cursor = position;
@@ -310,6 +382,12 @@ export class FlockServer {
   }
 
   private handleClose(socket: WebSocket): void {
+    const pending = this.pendingCursors.get(socket);
+    if (pending) {
+      clearTimeout(pending.timer);
+      this.pendingCursors.delete(socket);
+    }
+
     const state = this.sockets.get(socket);
     this.sockets.delete(socket);
     if (!state?.roomId || !state.userId) return;

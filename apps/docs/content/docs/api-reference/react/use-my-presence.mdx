@@ -1,0 +1,75 @@
+---
+title: useMyPresence
+description: Returns your own presence metadata and an updater function.
+---
+
+```ts
+import { useMyPresence } from "@flock-sdk/react";
+```
+
+## Signature
+
+```ts
+function useMyPresence(): [UserMetadata, (update: Partial<UserMetadata>) => void]
+```
+
+## Returns
+
+A tuple of `[currentMetadata, updateFn]`.
+
+- `currentMetadata` — your current presence metadata (the merged result of initial `metadata` prop plus any updates you've sent).
+- `updateFn` — a function that merges a partial update into your metadata and broadcasts it to the room.
+
+## Re-renders
+
+The hook re-renders immediately when you call the updater (optimistic update — your own change is reflected locally before the server round-trip).
+
+## Usage
+
+```tsx
+function StatusPicker() {
+  const [me, updateMe] = useMyPresence();
+
+  return (
+    <div>
+      <span>Showing as: {me.name}</span>
+      <button onClick={() => updateMe({ status: "away" })}>Go away</button>
+      <button onClick={() => updateMe({ status: "active" })}>Come back</button>
+    </div>
+  );
+}
+```
+
+## Metadata merging
+
+Updates are merged, not replaced. Calling `updateMe({ status: "idle" })` preserves your existing `name` and `color`.
+
+```ts
+// initial metadata: { name: "Alice", color: "#7c5cff" }
+updateMe({ status: "idle" });
+// result: { name: "Alice", color: "#7c5cff", status: "idle" }
+```
+
+Other users will see the merged metadata in `usePresence()`.
+
+## Custom fields
+
+`UserMetadata` has an open index signature so you can add any extra fields your app needs:
+
+```ts
+interface UserMetadata {
+  name?: string;
+  color?: string;
+  avatar?: string;
+  [key: string]: unknown;  // custom fields
+}
+```
+
+## Requirements
+
+Must be called inside a `<FlockProvider>`. Throws if used outside one.
+
+## See also
+
+- [Presence metadata guide](/docs/guides/presence-metadata)
+- [`usePresence`](/docs/api-reference/react/use-presence) to read other users' metadata

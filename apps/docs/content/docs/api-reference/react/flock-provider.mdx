@@ -1,0 +1,56 @@
+---
+title: FlockProvider
+description: The React context provider that sets up the Flock connection and makes hooks available to child components.
+---
+
+`<FlockProvider>` creates the `FlockClient`, joins the specified room, and makes the connection available via React context so all child hooks (`useCursors`, `usePresence`, etc.) work without prop drilling.
+
+Place it once near the top of your component tree, above any components that call Flock hooks.
+
+```tsx
+import { FlockProvider } from "@flock-sdk/react";
+
+export default function App() {
+  return (
+    <FlockProvider
+      serverUrl="wss://your-flock-server.com"
+      roomId="my-room"
+      userId="user-123"
+      metadata={{ name: "Alice", color: "#7c5cff" }}
+    >
+      <YourApp />
+    </FlockProvider>
+  );
+}
+```
+
+## Props
+
+`FlockProviderProps` extends `FlockClientOptions` and `RoomOptions`.
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `serverUrl` | `string` | Yes | — | WebSocket URL of the Flock server |
+| `roomId` | `string` | Yes | — | The room to join |
+| `userId` | `string` | Yes | — | Your user's unique identifier |
+| `metadata` | `UserMetadata` | No | `{}` | Initial presence metadata: `name`, `color`, `avatar`, plus any custom fields |
+| `apiKey` | `string` | No | — | API key, if the server requires one |
+| `interpolate` | `boolean` | No | `true` | Enable smooth cursor interpolation between received positions |
+| `interpolationMs` | `number` | No | `80` | The interpolation window in milliseconds. Larger = smoother but laggier |
+| `cursor.throttleMs` | `number` | No | `50` | Milliseconds between cursor update messages (~20/sec at default) |
+| `reconnect.maxAttempts` | `number` | No | `Infinity` | Max reconnect attempts before giving up |
+| `reconnect.baseDelayMs` | `number` | No | `1000` | Initial reconnect delay |
+| `reconnect.maxDelayMs` | `number` | No | `30000` | Max reconnect delay |
+| `children` | `ReactNode` | Yes | — | Your app content |
+
+## Lifecycle
+
+The provider creates a `FlockClient` and joins the room inside a `useEffect`. When the component unmounts it destroys the client and cleans up the WebSocket connection. The effect re-runs if `serverUrl`, `roomId`, or `userId` change.
+
+Toggling `interpolate` or `interpolationMs` does **not** reconnect — those props are presentation-only and update in place.
+
+## TypeScript
+
+```ts
+import type { FlockProviderProps } from "@flock-sdk/react";
+```

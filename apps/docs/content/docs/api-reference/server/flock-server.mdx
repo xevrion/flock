@@ -1,0 +1,89 @@
+---
+title: FlockServer
+description: The main class for the @flock-sdk/server package. Starts and manages the WebSocket presence server.
+---
+
+`FlockServer` is the programmatic API for embedding the Flock server in an existing Node.js application. If you just want to run the server standalone, use `npx @flock-sdk/server` or Docker instead.
+
+```ts
+import { FlockServer } from "@flock-sdk/server";
+
+const server = new FlockServer({
+  port: 8787,
+  redisUrl: process.env.REDIS_URL,
+});
+
+await server.start();
+```
+
+## Constructor
+
+```ts
+new FlockServer(options?: FlockServerOptions)
+```
+
+All options are optional. When omitted, the server runs on port 8787 in single-instance in-memory mode.
+
+## FlockServerOptions
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | `8787` | Port to listen on. Overridden by `FLOCK_PORT` env var when running via CLI |
+| `redisUrl` | `string` | — | Redis connection URL. If omitted, the server runs in single-instance mode with no TTL eviction or cross-instance pub/sub |
+| `apiKeys` | `string[]` | — | Allowed API keys. If set, clients must provide a matching key in their join message or the connection is rejected |
+| `presence.ttlSeconds` | `number` | `30` | Seconds before a user without a heartbeat is evicted. The user appears to leave when this expires |
+| `presence.heartbeatIntervalMs` | `number` | `10000` | How often the client SDK sends heartbeats to keep presence alive |
+| `maxMessagesPerSecond` | `number` | `100` | Per-connection rate limit. Connections that exceed this are closed with an error message |
+| `logger` | `boolean` | `true` | Enable structured pino JSON logging. Set to `false` for quiet operation in tests |
+
+## Methods
+
+### `start`
+
+```ts
+start(): Promise<void>
+```
+
+Starts the HTTP + WebSocket server. Listens on the configured port. Also starts the `/health` HTTP endpoint on the same port. When Redis is configured, opens the pub/sub subscription connections.
+
+### `stop`
+
+```ts
+stop(): Promise<void>
+```
+
+Gracefully shuts down: closes the WebSocket server (disconnecting all clients), tears down Redis connections, and clears all in-memory state.
+
+### `getRoomCount`
+
+```ts
+getRoomCount(): number
+```
+
+Returns the number of currently active rooms on this instance.
+
+### `getClientCount`
+
+```ts
+getClientCount(): number
+```
+
+Returns the total number of currently connected clients on this instance.
+
+## Health endpoint
+
+The server exposes `GET /health` on the same port as the WebSocket listener. It returns:
+
+```json
+{ "status": "ok" }
+```
+
+with a 200 status. Use this for load balancer health checks, Docker health checks, and uptime monitors.
+
+## Single-instance vs. multi-instance
+
+Without a `redisUrl`, all room state is in memory. This works fine for a single server. Restarting loses all presence.
+
+With `redisUrl`, presence is stored in Redis with TTL, and messages are published to Redis pub/sub channels. Multiple server instances can share the same Redis and clients connected to different instances will see each other's cursors and presence events.
+
+See the [scaling guide](/docs/guides/scaling) for details.

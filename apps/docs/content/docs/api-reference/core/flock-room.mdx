@@ -1,0 +1,151 @@
+---
+title: FlockRoom
+description: Per-room state and actions. Returned by FlockClient.joinRoom().
+---
+
+`FlockRoom` represents a single room. You get one back from `client.joinRoom()`. It holds the room's current cursor and presence state and lets you send updates and listen for changes.
+
+If you're using React, you don't need to use `FlockRoom` directly — the hooks handle it for you. Use `useRoom()` to get the raw room instance if you need escape-hatch access.
+
+## State accessors
+
+### `roomId`
+
+```ts
+readonly roomId: string
+```
+
+The room's identifier, as passed to `joinRoom`.
+
+### `getCursors`
+
+```ts
+getCursors(): Map<UserId, UserCursor>
+```
+
+Returns a snapshot of all other users' current cursor positions in the room.
+
+### `getPresence`
+
+```ts
+getPresence(): Map<UserId, PresenceUser>
+```
+
+Returns a snapshot of all users currently present in the room (excluding yourself).
+
+### `getMyPresence`
+
+```ts
+getMyPresence(): UserMetadata
+```
+
+Returns your own current presence metadata.
+
+## Actions
+
+### `updateCursor`
+
+```ts
+updateCursor(position: CursorPosition): void
+```
+
+Sends a cursor position update. Throttled to the `cursor.throttleMs` configured in `joinRoom` (default 50ms, ~20 updates/sec). Position values should be in 0–1 normalized coordinates.
+
+```ts
+document.addEventListener("mousemove", (e) => {
+  room.updateCursor({
+    x: e.clientX / window.innerWidth,
+    y: e.clientY / window.innerHeight,
+  });
+});
+```
+
+### `updatePresence`
+
+```ts
+updatePresence(metadata: Partial<UserMetadata>): void
+```
+
+Merges a partial update into your presence metadata. Only the fields you provide are changed; others are untouched.
+
+```ts
+room.updatePresence({ status: "idle" });
+// color and name are preserved
+```
+
+### `leave`
+
+```ts
+leave(): void
+```
+
+Sends a clean leave message to the server and removes the room locally. Other users see you leave immediately rather than waiting for the TTL to expire.
+
+## Events
+
+### `on`
+
+```ts
+on(event: string, handler: Function): () => void
+```
+
+Subscribes to room events. Returns an unsubscribe function.
+
+**Available events:**
+
+```ts
+// Another user moved their cursor
+on("cursor:update", (userId: UserId, cursor: UserCursor) => void): () => void
+
+// Another user's cursor was removed (they left the viewport or left the room)
+on("cursor:remove", (userId: UserId) => void): () => void
+
+// A user joined the room
+on("presence:join", (userId: UserId, user: PresenceUser) => void): () => void
+
+// A user left the room
+on("presence:leave", (userId: UserId) => void): () => void
+
+// A user updated their presence metadata
+on("presence:update", (userId: UserId, metadata: UserMetadata) => void): () => void
+```
+
+### `off`
+
+```ts
+off(event: string, handler: Function): void
+```
+
+Removes an event listener.
+
+## Types
+
+### UserCursor
+
+```ts
+interface UserCursor {
+  userId: UserId;
+  position: CursorPosition;   // { x: 0–1, y: 0–1 }
+  metadata: UserMetadata;
+  lastUpdatedAt: number;       // unix ms
+}
+```
+
+### PresenceUser
+
+```ts
+interface PresenceUser {
+  userId: UserId;
+  metadata: UserMetadata;
+  joinedAt: number;            // unix ms
+}
+```
+
+### CursorPosition
+
+```ts
+interface CursorPosition {
+  x: number;   // 0–1, viewport-relative
+  y: number;   // 0–1, viewport-relative
+}
+```

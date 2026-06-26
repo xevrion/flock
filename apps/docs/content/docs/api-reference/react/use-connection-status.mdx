@@ -1,0 +1,69 @@
+---
+title: useConnectionStatus
+description: Returns the current WebSocket connection status.
+---
+
+```ts
+import { useConnectionStatus } from "@flock-sdk/react";
+```
+
+## Signature
+
+```ts
+function useConnectionStatus(): ConnectionStatus
+```
+
+## Returns
+
+One of: `"connecting"`, `"connected"`, `"disconnected"`, `"reconnecting"`, `"error"`.
+
+```ts
+type ConnectionStatus =
+  | "connecting"       // initial connection in progress
+  | "connected"        // socket open, joined the room
+  | "disconnected"     // clean disconnect or not yet started
+  | "reconnecting"     // unexpected drop, trying to reconnect
+  | "error"            // reconnect attempts exhausted
+```
+
+## Re-renders
+
+The hook re-renders whenever the connection status changes.
+
+## Usage
+
+```tsx
+function StatusIndicator() {
+  const status = useConnectionStatus();
+
+  const color = {
+    connecting: "yellow",
+    connected: "green",
+    disconnected: "gray",
+    reconnecting: "yellow",
+    error: "red",
+  }[status];
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: color,
+      }} />
+      <span>{status}</span>
+    </div>
+  );
+}
+```
+
+## Reconnection
+
+When the WebSocket drops unexpectedly, Flock automatically tries to reconnect with exponential backoff. During this period the status is `"reconnecting"`. Once reconnected it returns to `"connected"` and all room state resumes.
+
+If reconnect attempts are exhausted (when `reconnect.maxAttempts` is set), the status becomes `"error"`.
+
+## Requirements
+
+Must be called inside a `<FlockProvider>`. Throws if used outside one.

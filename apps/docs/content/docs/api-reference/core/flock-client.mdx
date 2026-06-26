@@ -1,0 +1,116 @@
+---
+title: FlockClient
+description: The main entry point for the @flock-sdk/core package. Manages the WebSocket connection and room membership.
+---
+
+`FlockClient` manages a single WebSocket connection to the Flock server and lets you join multiple rooms on that connection.
+
+```ts
+import { FlockClient } from "@flock-sdk/core";
+
+const client = new FlockClient({
+  serverUrl: "wss://your-flock-server.com",
+  apiKey: "optional-key",
+});
+```
+
+## Constructor
+
+```ts
+new FlockClient(options: FlockClientOptions)
+```
+
+### FlockClientOptions
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `serverUrl` | `string` | Yes | — | WebSocket URL of the Flock server (`ws://` or `wss://`) |
+| `apiKey` | `string` | No | — | API key sent with the join message; required if the server has `FLOCK_API_KEYS` set |
+| `reconnect.maxAttempts` | `number` | No | `Infinity` | Stop reconnecting after this many failures |
+| `reconnect.baseDelayMs` | `number` | No | `1000` | Initial delay before the first reconnect attempt |
+| `reconnect.maxDelayMs` | `number` | No | `30000` | Maximum delay between reconnect attempts (caps the exponential backoff) |
+
+## Properties
+
+### `status`
+
+```ts
+readonly status: ConnectionStatus
+```
+
+The current connection state. One of: `"connecting"`, `"connected"`, `"disconnected"`, `"reconnecting"`, `"error"`.
+
+## Methods
+
+### `joinRoom`
+
+```ts
+joinRoom(roomId: string, options: RoomOptions): FlockRoom
+```
+
+Joins a room and returns a `FlockRoom` instance. If the connection is already open, the join message is sent immediately. If it's still connecting, the join is queued and sent once the socket opens.
+
+```ts
+const room = client.joinRoom("my-room", {
+  userId: "user-abc",
+  metadata: { name: "Alice", color: "#7c5cff" },
+  cursor: { throttleMs: 50 },
+});
+```
+
+**RoomOptions:**
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `userId` | `string` | Yes | — | Unique identifier for this user in the room |
+| `metadata` | `UserMetadata` | No | `{}` | Initial presence metadata (name, color, avatar, custom fields) |
+| `cursor.throttleMs` | `number` | No | `50` | Minimum milliseconds between cursor update messages |
+| `cursor.normalize` | `boolean` | No | `true` | Normalize raw pixel coordinates to 0–1 viewport-relative values |
+
+### `leaveRoom`
+
+```ts
+leaveRoom(roomId: string): void
+```
+
+Sends a leave message to the server and cleans up local state for that room.
+
+### `leaveAllRooms`
+
+```ts
+leaveAllRooms(): void
+```
+
+Leaves every currently-joined room.
+
+### `destroy`
+
+```ts
+destroy(): void
+```
+
+Closes the WebSocket connection and cleans up all rooms. After calling `destroy()` the client does not reconnect.
+
+### `on`
+
+```ts
+on(event: "status:change", handler: (status: ConnectionStatus) => void): () => void
+on(event: "error", handler: (error: FlockError) => void): () => void
+```
+
+Subscribes to connection-level events. Returns an unsubscribe function.
+
+```ts
+const unsub = client.on("status:change", (status) => {
+  console.log("Connection is now:", status);
+});
+
+// Later:
+unsub();
+```
+
+## Connection lifecycle
+
+The client connects automatically when you call `joinRoom` for the first time. On unexpected disconnection it enters exponential backoff reconnection: `baseDelayMs`, `2 * baseDelayMs`, `4 * baseDelayMs`, ... up to `maxDelayMs`. If all attempts are exhausted, `status` becomes `"error"` and an `error` event fires.
+
+After a successful reconnect, the client automatically re-sends join messages for all rooms so you don't lose your place.

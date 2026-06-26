@@ -1,0 +1,77 @@
+---
+title: Configuration
+description: Environment variables for running the Flock server via npx or Docker.
+---
+
+When running the Flock server via `npx @flock-sdk/server` or Docker, all configuration is done through environment variables.
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `FLOCK_PORT` | `8787` | Port the server listens on |
+| `FLOCK_REDIS_URL` | — | Redis connection URL (e.g. `redis://localhost:6379` or `rediss://user:pass@host:6380`). Omit to run in single-instance in-memory mode |
+| `FLOCK_API_KEYS` | — | Comma-separated list of valid API keys. When set, clients must send a matching key with their join message. Omit for open (unauthenticated) mode |
+| `FLOCK_PRESENCE_TTL_SECONDS` | `30` | Seconds before an idle user (one that stopped heartbeating) is evicted from the room |
+| `FLOCK_HEARTBEAT_INTERVAL_MS` | `10000` | Expected client heartbeat interval. The server uses this with `ttlSeconds` to size the eviction window |
+| `FLOCK_MAX_MESSAGES_PER_SECOND` | `100` | Per-connection rate limit. Connections that exceed this receive an error and are closed |
+| `FLOCK_LOG_LEVEL` | `info` | Pino log level: `trace`, `debug`, `info`, `warn`, `error`, `silent` |
+
+## Examples
+
+### Local development (no Redis, no auth)
+
+```bash
+npx @flock-sdk/server
+```
+
+### With Redis and API key authentication
+
+```bash
+FLOCK_REDIS_URL=redis://localhost:6379 \
+FLOCK_API_KEYS=mykey1,mykey2 \
+npx @flock-sdk/server
+```
+
+### Docker with environment variables
+
+```bash
+docker run -p 8787:8787 \
+  -e FLOCK_REDIS_URL=redis://your-redis:6379 \
+  -e FLOCK_API_KEYS=my-secret-key \
+  -e FLOCK_PRESENCE_TTL_SECONDS=60 \
+  flock-server
+```
+
+## Client-side options
+
+The corresponding client-side options (passed through `<FlockProvider>` or `FlockClientOptions`) are:
+
+| Client option | Pairs with |
+|---|---|
+| `serverUrl` | The URL of your running Flock server |
+| `apiKey` | Must match one of the server's `FLOCK_API_KEYS` |
+| `reconnect.baseDelayMs` | Starting backoff delay on disconnect |
+| `reconnect.maxDelayMs` | Maximum backoff delay |
+| `reconnect.maxAttempts` | Give up after this many failed reconnects |
+| `cursor.throttleMs` | How often cursor moves are sent (default 50ms = 20/sec) |
+
+## Programmatic configuration
+
+When embedding the server in your own Node.js application, pass these as options to the `FlockServer` constructor instead of environment variables:
+
+```ts
+const server = new FlockServer({
+  port: 8787,
+  redisUrl: process.env.REDIS_URL,
+  apiKeys: ["key1", "key2"],
+  presence: {
+    ttlSeconds: 60,
+    heartbeatIntervalMs: 15000,
+  },
+  maxMessagesPerSecond: 200,
+  logger: true,
+});
+```
+
+See [FlockServer](/docs/api-reference/server/flock-server) for the full options reference.

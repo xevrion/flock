@@ -1,0 +1,68 @@
+---
+title: useCursors
+description: Returns a live snapshot of all other users' cursor positions in the room.
+---
+
+```ts
+import { useCursors } from "@flock-sdk/react";
+```
+
+## Signature
+
+```ts
+function useCursors(): Record<UserId, UserCursor>
+```
+
+## Returns
+
+A `Record` mapping each other user's `userId` to their current `UserCursor`. Your own cursor is not included.
+
+```ts
+interface UserCursor {
+  userId: string;
+  position: { x: number; y: number };  // normalized 0–1
+  metadata: UserMetadata;               // name, color, avatar, custom fields
+  lastUpdatedAt: number;                // unix ms of last received update
+}
+```
+
+## Re-renders
+
+With interpolation enabled (the default), the hook drives a `requestAnimationFrame` loop and updates state once per animation frame while any cursor is moving, giving you smooth cursor positions at display refresh rate.
+
+With `interpolate={false}` on the provider, the hook updates only when a cursor update arrives from the server (roughly the throttle rate, default 20/sec).
+
+## Usage
+
+```tsx
+function CursorOverlay() {
+  const cursors = useCursors();
+
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
+      {Object.values(cursors).map((cursor) => (
+        <div
+          key={cursor.userId}
+          style={{
+            position: "absolute",
+            left: `${cursor.position.x * 100}%`,
+            top: `${cursor.position.y * 100}%`,
+            transform: "translate(-50%, -50%)",
+            color: cursor.metadata.color,
+          }}
+        >
+          {cursor.metadata.name}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Requirements
+
+Must be called inside a `<FlockProvider>`. Throws if used outside one.
+
+## See also
+
+- [Custom cursor rendering guide](/docs/guides/custom-cursor-rendering) for HTML, Canvas, and SVG approaches

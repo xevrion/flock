@@ -1,0 +1,68 @@
+---
+title: usePresence
+description: Returns the list of other users currently in the room with their metadata.
+---
+
+```ts
+import { usePresence } from "@flock-sdk/react";
+```
+
+## Signature
+
+```ts
+function usePresence(): PresenceUser[]
+```
+
+## Returns
+
+An array of `PresenceUser` objects for everyone in the room except yourself.
+
+```ts
+interface PresenceUser {
+  userId: string;
+  metadata: UserMetadata;   // name, color, avatar, and any custom fields
+  joinedAt: number;          // unix ms when this user joined the room
+}
+```
+
+## Re-renders
+
+The hook re-renders when:
+- A user joins the room
+- A user leaves the room
+- A user updates their presence metadata (via `updatePresence` or `useMyPresence`)
+
+## Usage
+
+```tsx
+function OnlineUsers() {
+  const users = usePresence();
+
+  return (
+    <div>
+      {users.length === 0 ? (
+        <span>Just you</span>
+      ) : (
+        users.map((user) => (
+          <div key={user.userId} style={{ color: user.metadata.color }}>
+            {user.metadata.name}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+```
+
+## Initial state
+
+The server sends a full room snapshot (all current users) when you join. `usePresence` is seeded from this snapshot, so the hook is never empty for a room that already has users when you connect.
+
+## Requirements
+
+Must be called inside a `<FlockProvider>`. Throws if used outside one.
+
+## See also
+
+- [Presence metadata guide](/docs/guides/presence-metadata) for using names, colors, avatars, and custom fields
+- [`useMyPresence`](/docs/api-reference/react/use-my-presence) to read and update your own presence

@@ -2,6 +2,8 @@
 
 Real-time multiplayer presence and live cursors for the web.
 
+**Bundle sizes (gzipped):** `@flock-sdk/core` ~6KB, `@flock-sdk/react` ~3KB on top of core.
+
 ## Packages
 
 | Package | Description |

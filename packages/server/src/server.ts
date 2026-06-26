@@ -16,6 +16,7 @@ import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
 const DEFAULT_MAX_MESSAGES_PER_SECOND = 100;
+const DEFAULT_MAX_ROOM_SIZE = 10;
 
 // Sliding-window rate limiter. Tracks incoming-message timestamps for a socket
 // and returns true when the limit is exceeded.
@@ -44,6 +45,7 @@ export interface FlockServerOptions {
   redisUrl?: string;
   apiKeys?: string[];
   maxMessagesPerSecond?: number;
+  maxRoomSize?: number;
   presence?: {
     ttlSeconds?: number;
     heartbeatIntervalMs?: number;
@@ -96,6 +98,7 @@ export class FlockServer {
   private readonly ttlSeconds: number;
   private readonly apiKeys?: string[];
   private readonly maxMessagesPerSecond: number;
+  private readonly maxRoomSize: number;
   private http?: Server;
   private wss?: WebSocketServer;
   private readonly instanceId = randomUUID();
@@ -119,6 +122,8 @@ export class FlockServer {
     this.apiKeys = options.apiKeys ?? process.env.FLOCK_API_KEYS?.split(",").map((k) => k.trim()).filter(Boolean);
     const envMaxMps = process.env.FLOCK_MAX_MESSAGES_PER_SECOND;
     this.maxMessagesPerSecond = options.maxMessagesPerSecond ?? (envMaxMps ? Number(envMaxMps) : DEFAULT_MAX_MESSAGES_PER_SECOND);
+    const envRoomSize = process.env.FLOCK_MAX_ROOM_SIZE;
+    this.maxRoomSize = options.maxRoomSize ?? (envRoomSize ? Number(envRoomSize) : DEFAULT_MAX_ROOM_SIZE);
   }
 
   start(): Promise<void> {
@@ -287,6 +292,21 @@ export class FlockServer {
         type: "error",
         code: "INVALID_API_KEY",
         message: "invalid or missing api key",
+      });
+      socket.close();
+      return;
+    }
+
+    // Reject if the room is already at capacity, unless this user is already in
+    // the room (a reconnect should always be allowed through).
+    const alreadyInRoom = !!this.rooms.getClient(roomId, userId);
+    const currentSize = this.rooms.getRoomClients(roomId).length;
+    if (!alreadyInRoom && currentSize >= this.maxRoomSize) {
+      this.log.warn({ roomId, userId, currentSize, maxRoomSize: this.maxRoomSize }, "rejected join: room full");
+      this.send(socket, {
+        type: "error",
+        code: "ROOM_FULL",
+        message: `room is full (max ${this.maxRoomSize} users)`,
       });
       socket.close();
       return;

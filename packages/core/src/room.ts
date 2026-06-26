@@ -148,18 +148,25 @@ export class Room implements IFlockRoom {
           });
         }
         for (const user of msg.users) {
-          this.presence.set(user.userId, {
+          const presenceUser: PresenceUser = {
             userId: user.userId,
             metadata: user.metadata,
             joinedAt: Date.now(),
-          });
+          };
+          this.presence.set(user.userId, presenceUser);
+          // Fire join events for everyone already in the room. The snapshot
+          // arrives after the hooks have rendered, so without this they would
+          // never learn about people who were here before we joined.
+          this.emit("presence:join", user.userId, presenceUser);
           if (user.cursor) {
-            this.cursors.set(user.userId, {
+            const cursor: UserCursor = {
               userId: user.userId,
               position: user.cursor,
               metadata: user.metadata,
               lastUpdatedAt: Date.now(),
-            });
+            };
+            this.cursors.set(user.userId, cursor);
+            this.emit("cursor:update", user.userId, cursor);
           }
         }
         break;

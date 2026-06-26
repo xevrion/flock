@@ -201,6 +201,59 @@ describe("FlockServer", () => {
     b.close();
   });
 
+  it("accepts a join with a valid api key when keys are configured", async () => {
+    const s = new FlockServer({ port: PORT + 1, logger: false, apiKeys: ["secret"] });
+    await s.start();
+    const ws = await connect();
+    // use the wrong port to avoid the existing server; connect to s instead
+    ws.close();
+
+    const ws2 = new WebSocket(`ws://localhost:${PORT + 1}`);
+    const ack = await new Promise<Record<string, unknown>>((resolve, reject) => {
+      ws2.on("open", () => {
+        ws2.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {}, apiKey: "secret" }));
+      });
+      ws2.on("message", (d: Buffer) => {
+        const msg = JSON.parse(d.toString()) as Record<string, unknown>;
+        resolve(msg);
+      });
+      ws2.on("error", reject);
+    });
+
+    expect(ack.type).toBe("join:ack");
+    ws2.close();
+    await s.stop();
+  });
+
+  it("rejects a join with a bad api key and closes the socket", async () => {
+    const s = new FlockServer({ port: PORT + 2, logger: false, apiKeys: ["secret"] });
+    await s.start();
+
+    const ws = new WebSocket(`ws://localhost:${PORT + 2}`);
+    const result = await new Promise<{ type: string; closed: boolean }>((resolve) => {
+      let type = "";
+      ws.on("open", () => {
+        ws.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {}, apiKey: "wrong" }));
+      });
+      ws.on("message", (d: Buffer) => {
+        type = (JSON.parse(d.toString()) as Record<string, unknown>).type as string;
+      });
+      ws.on("close", () => resolve({ type, closed: true }));
+    });
+
+    expect(result.type).toBe("error");
+    expect(result.closed).toBe(true);
+    await s.stop();
+  });
+
+  it("accepts any join when no api keys are configured", async () => {
+    const a = await connect();
+    a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));
+    const ack = await waitFor(a, "join:ack");
+    expect(ack.type).toBe("join:ack");
+    a.close();
+  });
+
   it("relays cursor moves to other members", async () => {
     const a = await connect();
     a.send(JSON.stringify({ type: "join", roomId: "r", userId: "a", metadata: {} }));

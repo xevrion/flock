@@ -11,6 +11,7 @@ import { RoomManager } from "./room-manager.js";
 import { PresenceStore, parsePresenceKey } from "./presence.js";
 import { PubSub } from "./pubsub.js";
 import { Broadcaster } from "./broadcast.js";
+import { validateApiKey } from "./api-key.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
@@ -69,6 +70,7 @@ export class FlockServer {
   private readonly rooms = new RoomManager();
   private readonly redisUrl?: string;
   private readonly ttlSeconds: number;
+  private readonly apiKeys?: string[];
   private http?: Server;
   private wss?: WebSocketServer;
   private readonly instanceId = randomUUID();
@@ -88,6 +90,7 @@ export class FlockServer {
     this.redisUrl = options.redisUrl ?? process.env.FLOCK_REDIS_URL;
     this.ttlSeconds =
       options.presence?.ttlSeconds ?? envTtlSeconds() ?? DEFAULT_TTL_SECONDS;
+    this.apiKeys = options.apiKeys ?? process.env.FLOCK_API_KEYS?.split(",").map((k) => k.trim()).filter(Boolean);
   }
 
   start(): Promise<void> {
@@ -235,6 +238,17 @@ export class FlockServer {
     msg: Extract<ClientMessage, { type: "join" }>,
   ): void {
     const { roomId, userId, metadata } = msg;
+
+    if (!validateApiKey(msg.apiKey, this.apiKeys)) {
+      this.log.warn({ userId }, "rejected join: invalid api key");
+      this.send(socket, {
+        type: "error",
+        code: "INVALID_API_KEY",
+        message: "invalid or missing api key",
+      });
+      socket.close();
+      return;
+    }
 
     // If this userId is already in the room on a different socket (a duplicate
     // tab or a refresh that beat the old socket's close), evict the old one

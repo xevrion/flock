@@ -1,130 +1,149 @@
 # Flock
 
-Real-time multiplayer presence and live cursors for the web.
+Real-time multiplayer presence and live cursors for any web app — in 10 lines of code.
 
-**Bundle sizes (gzipped):** `@flock-sdk/core` ~6KB, `@flock-sdk/react` ~3KB on top of core.
+[![npm](https://img.shields.io/npm/v/@flock-sdk/core?label=%40flock-sdk%2Fcore)](https://www.npmjs.com/package/@flock-sdk/core)
+[![npm](https://img.shields.io/npm/v/@flock-sdk/react?label=%40flock-sdk%2Freact)](https://www.npmjs.com/package/@flock-sdk/react)
+[![npm](https://img.shields.io/npm/v/@flock-sdk/server?label=%40flock-sdk%2Fserver)](https://www.npmjs.com/package/@flock-sdk/server)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/xevrion/flock/actions/workflows/ci.yml/badge.svg)](https://github.com/xevrion/flock/actions/workflows/ci.yml)
 
-## Packages
+<!-- TODO: record and add demo GIF here -->
+<!-- Record a 10-second screen capture of the canvas demo showing two browser windows
+     with live cursors moving in sync. Save as demo.gif and replace this comment with:
+     ![Flock demo](./demo.gif) -->
 
-| Package | Description |
-|---|---|
-| `@flock-sdk/core` | Framework-agnostic WebSocket transport, cursor interpolation, reconnection with backoff |
-| `@flock-sdk/react` | React hooks: `usePresence`, `useCursors`, `useConnectionStatus` |
-| `@flock-sdk/server` | Node.js WebSocket server with Redis-backed presence TTL and pub/sub fan-out |
+**Bundle sizes:** `@flock-sdk/core` ~6KB gzipped · `@flock-sdk/react` ~3KB gzipped
 
-## Run it locally
-
-Build the packages:
-
-```bash
-pnpm install
-pnpm build
-```
-
-Start the server:
+## Install
 
 ```bash
-node packages/server/dist/cli.js
+npm install @flock-sdk/react
+npx @flock-sdk/server
 ```
 
-The server runs in-memory by default. To enable TTL-based presence eviction and
-multi-instance fan-out, point it at a Redis instance:
+## Quickstart
+
+```tsx
+import { FlockProvider, useCursors, usePresence } from "@flock-sdk/react";
+
+function CursorOverlay() {
+  const cursors = useCursors();
+  return (
+    <>
+      {Object.values(cursors).map((cursor) => (
+        <div
+          key={cursor.userId}
+          style={{
+            position: "fixed",
+            left: `${cursor.position.x * 100}%`,
+            top: `${cursor.position.y * 100}%`,
+            pointerEvents: "none",
+            color: cursor.metadata.color,
+          }}
+        >
+          {cursor.metadata.name}
+        </div>
+      ))}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <FlockProvider
+      serverUrl="ws://localhost:8787"
+      roomId="my-room"
+      userId="user-123"
+      metadata={{ name: "Alice", color: "#7c5cff" }}
+    >
+      <CursorOverlay />
+    </FlockProvider>
+  );
+}
+```
+
+Open the page in two browser tabs and move your mouse — each tab sees the other's cursor.
+
+## Why Flock?
+
+| | Flock | Liveblocks | DIY |
+|---|---|---|---|
+| Self-hostable | Yes | **No** | Yes |
+| License | MIT | Partial AGPL | — |
+| Per-seat pricing | None | Yes (free tier has hard caps) | None |
+| Connection caps | None | 10 per room on free tier | None |
+| Setup time | 10 lines | Full platform onboarding | Weeks |
+| Bundle size | ~6KB gzipped | Much larger | — |
+
+Flock does one thing well: presence and live cursors. If you need document sync, comments, or notifications — those are out of scope by design. Flock is the smallest thing that makes your app feel multiplayer.
+
+## Demos
+
+- Canvas demo: collaborative canvas with live cursors and presence bar — [demo-canvas app](apps/demo-canvas)
+- Presence widget: "who's viewing this page" widget — [demo-presence app](apps/demo-presence)
+
+Both demos run locally with `pnpm --filter demo-canvas dev` and `pnpm --filter demo-presence dev` after starting the server.
+
+## Self-hosting
 
 ```bash
-FLOCK_REDIS_URL=redis://localhost:6379 node packages/server/dist/cli.js
+# Docker (recommended for production)
+docker run -p 8787:8787 \
+  -e FLOCK_REDIS_URL=redis://your-redis:6379 \
+  ghcr.io/xevrion/flock-server:latest
 ```
-
-Then start the demo:
 
 ```bash
-pnpm --filter demo-canvas dev
+# npx (quickest for local dev)
+npx @flock-sdk/server
 ```
 
-Open http://localhost:3100 in two tabs. Copy the `?room=` code from the first
-tab's URL into the second so both join the same room, then move your mouse.
-
-## What to test
-
-- **Cursors and presence.** Move the mouse in one tab; the other shows the
-  cursor, name, and color. The presence bar lists who is in the room, and joins
-  and leaves raise a toast.
-- **Reconnection.** With two tabs connected, stop the server (Ctrl+C). Within a
-  couple of seconds the status dot turns yellow ("Reconnecting") and cursors
-  freeze. Restart the server; both tabs reconnect on their own (no reload), the
-  dot goes green, and cursors resume. The reconnected user keeps the same name
-  and color.
-- **TTL eviction.** Start the server with `FLOCK_REDIS_URL` set. Close one tab
-  without a clean disconnect; after the presence TTL (default 30s) the other
-  tab drops that user.
-- **Heartbeats.** Open DevTools, Network, WS, select the connection, and watch
-  `heartbeat` / `heartbeat:ack` frames every 10s while connected.
-- **Duplicate tab / same user.** Open the same room in two tabs as the same
-  user. The server evicts the first connection when the second one joins, so
-  only one cursor is ever shown.
-- **Rate limiting.** The server closes connections that exceed 100 messages per
-  second (configurable via `FLOCK_MAX_MESSAGES_PER_SECOND`).
-- **API key auth.** Set `FLOCK_API_KEYS=mykey` on the server and pass
-  `apiKey: "mykey"` in the client options. A missing or wrong key is rejected
-  with an `error:INVALID_API_KEY` message before the socket closes.
+```bash
+# Programmatic (embed in an existing Node server)
+import { FlockServer } from "@flock-sdk/server";
+const server = new FlockServer({ port: 8787, redisUrl: process.env.REDIS_URL });
+await server.start();
+```
 
 ## Server env vars
 
 | Variable | Default | Description |
 |---|---|---|
 | `FLOCK_PORT` | `8787` | Port to listen on |
-| `FLOCK_REDIS_URL` | — | Redis connection URL; enables TTL eviction and pub/sub |
-| `FLOCK_API_KEYS` | — | Comma-separated list of valid API keys; unset = open mode |
+| `FLOCK_REDIS_URL` | — | Redis URL; enables TTL eviction and pub/sub fan-out for multi-instance |
+| `FLOCK_API_KEYS` | — | Comma-separated API keys; omit for open mode |
 | `FLOCK_PRESENCE_TTL_SECONDS` | `30` | Seconds before an idle user is evicted |
-| `FLOCK_MAX_MESSAGES_PER_SECOND` | `100` | Per-connection message rate limit |
-| `FLOCK_LOG_LEVEL` | `info` | Pino log level (`debug`, `info`, `warn`, `error`) |
+| `FLOCK_MAX_MESSAGES_PER_SECOND` | `100` | Per-connection rate limit |
+| `FLOCK_LOG_LEVEL` | `info` | Pino log level |
 
-## Multi-instance / horizontal scaling
+## Packages
 
-When `FLOCK_REDIS_URL` is set, each server instance publishes outgoing messages
-to a Redis pub/sub channel (`flock:broadcast:{roomId}`) so that clients connected
-to different instances see each other's cursors and presence events. Each
-instance ignores its own published messages to avoid double-delivery.
+| Package | Description |
+|---|---|
+| `@flock-sdk/core` | Framework-agnostic WebSocket transport, cursor throttling and interpolation, reconnection with exponential backoff |
+| `@flock-sdk/react` | React hooks: `usePresence`, `useCursors`, `useMyPresence`, `useConnectionStatus`, `useRoom` |
+| `@flock-sdk/server` | Node.js WebSocket server with Redis-backed presence TTL and pub/sub fan-out |
 
-Spin up two instances to test locally:
+## Run locally
+
+```bash
+pnpm install
+pnpm build
+node packages/server/dist/cli.js         # server on :8787
+pnpm --filter demo-canvas dev            # canvas demo on :3100
+```
+
+Open http://localhost:3100 in two tabs and share the `?room=` URL.
+
+## Multi-instance scaling
+
+With Redis, multiple server instances coordinate via pub/sub. Clients on different instances see each other's cursors:
 
 ```bash
 FLOCK_PORT=8787 FLOCK_REDIS_URL=redis://localhost:6379 node packages/server/dist/cli.js &
 FLOCK_PORT=8788 FLOCK_REDIS_URL=redis://localhost:6379 node packages/server/dist/cli.js &
 ```
-
-Connect one browser tab to each port; cursor moves on one should appear on the other.
-
-## Docker
-
-```bash
-docker build -f packages/server/Dockerfile -t flock-server .
-docker run -e FLOCK_REDIS_URL=redis://... -p 8787:8787 flock-server
-```
-
-The image is based on `node:22-alpine` and comes in under 60MB.
-
-## Docs site
-
-The docs live in `apps/docs` (Next.js 15 + Fumadocs). Run locally:
-
-```bash
-pnpm --filter docs dev
-```
-
-Open http://localhost:3200. Content is in `apps/docs/content/docs/`.
-
-## Debugging the core SDK
-
-`playground/index.html` is a no-framework page that imports `@flock-sdk/core`
-directly, useful for testing the transport without React. Build the packages,
-start the server, then serve the repo over HTTP:
-
-```bash
-python3 -m http.server 5500
-```
-
-Open http://localhost:5500/playground/index.html in two tabs. It also shows the
-cursor throttle and interpolation counters.
 
 ## Tests
 
@@ -132,7 +151,22 @@ cursor throttle and interpolation counters.
 pnpm test
 ```
 
-Unit + integration tests cover the core transport, React hooks, server message
-handling, presence eviction, reconnection, duplicate-join eviction, cursor
-buffering, API key auth, rate limiting, and cross-instance pub/sub relay (the
-last requires a local Redis).
+58 tests across core, react, and server packages covering: cursor throttling and interpolation, reconnection with backoff, presence TTL eviction, duplicate-join handling, cursor buffering, API key auth, rate limiting, and cross-instance pub/sub relay.
+
+## Docs
+
+Full documentation at [flock.xevrion.dev](https://flock.xevrion.dev) (deployment pending). Run locally:
+
+```bash
+pnpm --filter docs dev
+```
+
+Open http://localhost:3200.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests are welcome.
+
+## License
+
+[MIT](LICENSE) — Yash Bavadiya (@xevrion)

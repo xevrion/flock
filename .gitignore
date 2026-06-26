@@ -8,6 +8,8 @@ build/
 .next/
 .turbo/
 out/
+next-env.d.ts
+*.tsbuildinfo
 
 # Logs
 *.log

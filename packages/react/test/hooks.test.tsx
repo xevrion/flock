@@ -50,6 +50,24 @@ describe("usePresence", () => {
     );
   }
 
+  it("shows users already in the room from the join snapshot", async () => {
+    // Two people are already here when we join. They arrive in join:ack, not as
+    // user:joined events, so the hook must surface them too.
+    server.setSnapshot([
+      { userId: "alice", metadata: { name: "Alice" } },
+      { userId: "bob", metadata: { name: "Bob" } },
+    ]);
+
+    render(
+      <Provider>
+        <PresenceList />
+      </Provider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("alice")).toBeDefined());
+    await waitFor(() => expect(screen.getByText("bob")).toBeDefined());
+  });
+
   it("adds a user when the server says one joined", async () => {
     render(
       <Provider>

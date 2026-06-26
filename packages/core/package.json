@@ -1,8 +1,15 @@
 {
   "name": "@flock-sdk/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Framework-agnostic real-time presence & cursor transport for Flock",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xevrion/flock.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://flock.xevrion.dev",
+  "keywords": ["flock", "presence", "cursors", "multiplayer", "websocket", "real-time"],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

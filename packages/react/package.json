@@ -1,8 +1,15 @@
 {
   "name": "@flock-sdk/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "React hooks adapter for Flock real-time presence & cursors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xevrion/flock.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://flock.xevrion.dev",
+  "keywords": ["flock", "presence", "cursors", "multiplayer", "react", "hooks", "real-time"],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -26,7 +33,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@flock-sdk/core": "workspace:*"
+    "@flock-sdk/core": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

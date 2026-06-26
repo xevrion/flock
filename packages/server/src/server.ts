@@ -12,6 +12,7 @@ import { PresenceStore, parsePresenceKey } from "./presence.js";
 import { PubSub } from "./pubsub.js";
 import { Broadcaster } from "./broadcast.js";
 import { validateApiKey } from "./api-key.js";
+import { createAdminHandler } from "./admin.js";
 import type { ClientMessage, ServerMessage } from "./messages.js";
 
 const DEFAULT_TTL_SECONDS = 30;
@@ -46,6 +47,7 @@ export interface FlockServerOptions {
   apiKeys?: string[];
   maxMessagesPerSecond?: number;
   maxRoomSize?: number;
+  adminPassword?: string;
   presence?: {
     ttlSeconds?: number;
     heartbeatIntervalMs?: number;
@@ -99,6 +101,7 @@ export class FlockServer {
   private readonly apiKeys?: string[];
   private readonly maxMessagesPerSecond: number;
   private readonly maxRoomSize: number;
+  private readonly adminPassword?: string;
   private http?: Server;
   private wss?: WebSocketServer;
   private readonly instanceId = randomUUID();
@@ -124,6 +127,7 @@ export class FlockServer {
     this.maxMessagesPerSecond = options.maxMessagesPerSecond ?? (envMaxMps ? Number(envMaxMps) : DEFAULT_MAX_MESSAGES_PER_SECOND);
     const envRoomSize = process.env.FLOCK_MAX_ROOM_SIZE;
     this.maxRoomSize = options.maxRoomSize ?? (envRoomSize ? Number(envRoomSize) : DEFAULT_MAX_ROOM_SIZE);
+    this.adminPassword = options.adminPassword ?? process.env.FLOCK_ADMIN_PASSWORD;
   }
 
   start(): Promise<void> {
@@ -141,7 +145,10 @@ export class FlockServer {
 
     this.broadcaster = new Broadcaster(this.rooms, this.pubsub);
 
-    this.http = createHealthServer();
+    const adminHandler = this.adminPassword
+      ? createAdminHandler(this.rooms, this.adminPassword, (roomId) => this.forceCloseRoom(roomId))
+      : undefined;
+    this.http = createHealthServer(adminHandler);
     this.wss = new WebSocketServer({ server: this.http });
 
     this.wss.on("connection", (socket) => {
@@ -253,6 +260,21 @@ export class FlockServer {
 
   getClientCount(): number {
     return this.rooms.getClientCount();
+  }
+
+  // Kicks all users in a room, closing their sockets. Called by the admin panel.
+  private forceCloseRoom(roomId: string): void {
+    const clients = this.rooms.closeRoom(roomId);
+    for (const client of clients) {
+      this.sockets.delete(client.socket);
+      this.send(client.socket, {
+        type: "error",
+        code: "INTERNAL_ERROR",
+        message: "room closed by admin",
+      });
+      client.socket.close();
+    }
+    this.log.info({ roomId, kicked: clients.length }, "admin closed room");
   }
 
   private handleMessage(socket: WebSocket, msg: ClientMessage): void {

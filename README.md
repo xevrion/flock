@@ -115,6 +115,8 @@ await server.start();
 | `FLOCK_API_KEYS` | — | Comma-separated API keys; omit for open mode |
 | `FLOCK_PRESENCE_TTL_SECONDS` | `30` | Seconds before an idle user is evicted |
 | `FLOCK_MAX_MESSAGES_PER_SECOND` | `100` | Per-connection rate limit |
+| `FLOCK_MAX_ROOM_SIZE` | `10` | Max users per room; 11th person is rejected |
+| `FLOCK_ADMIN_PASSWORD` | — | Enables `/admin` dashboard when set |
 | `FLOCK_LOG_LEVEL` | `info` | Pino log level |
 
 ## Packages

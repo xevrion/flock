@@ -13,9 +13,14 @@ export interface RoomClient {
   cursor?: { x: number; y: number };
 }
 
+interface RoomMeta {
+  clients: Map<string, RoomClient>;
+  createdAt: number;
+}
+
 export class RoomManager {
-  // roomId -> (userId -> client)
-  private rooms = new Map<string, Map<string, RoomClient>>();
+  // roomId -> room metadata + clients
+  private rooms = new Map<string, RoomMeta>();
 
   joinRoom(
     roomId: string,
@@ -25,11 +30,11 @@ export class RoomManager {
   ): RoomClient {
     let room = this.rooms.get(roomId);
     if (!room) {
-      room = new Map();
+      room = { clients: new Map(), createdAt: Date.now() };
       this.rooms.set(roomId, room);
     }
     const client: RoomClient = { userId, metadata, socket, joinedAt: Date.now() };
-    room.set(userId, client);
+    room.clients.set(userId, client);
     return client;
   }
 
@@ -37,21 +42,38 @@ export class RoomManager {
   leaveRoom(roomId: string, userId: string): number {
     const room = this.rooms.get(roomId);
     if (!room) return 0;
-    room.delete(userId);
-    if (room.size === 0) {
+    room.clients.delete(userId);
+    if (room.clients.size === 0) {
       this.rooms.delete(roomId);
       return 0;
     }
-    return room.size;
+    return room.clients.size;
   }
 
   getRoomClients(roomId: string): RoomClient[] {
     const room = this.rooms.get(roomId);
-    return room ? [...room.values()] : [];
+    return room ? [...room.clients.values()] : [];
   }
 
   getClient(roomId: string, userId: string): RoomClient | undefined {
-    return this.rooms.get(roomId)?.get(userId);
+    return this.rooms.get(roomId)?.clients.get(userId);
+  }
+
+  // Returns all sockets in a room and removes it, for forced closure.
+  closeRoom(roomId: string): RoomClient[] {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+    const clients = [...room.clients.values()];
+    this.rooms.delete(roomId);
+    return clients;
+  }
+
+  getAllRooms(): Array<{ roomId: string; createdAt: number; clients: RoomClient[] }> {
+    return [...this.rooms.entries()].map(([roomId, room]) => ({
+      roomId,
+      createdAt: room.createdAt,
+      clients: [...room.clients.values()],
+    }));
   }
 
   getRoomCount(): number {
@@ -60,7 +82,7 @@ export class RoomManager {
 
   getClientCount(): number {
     let total = 0;
-    for (const room of this.rooms.values()) total += room.size;
+    for (const room of this.rooms.values()) total += room.clients.size;
     return total;
   }
 }

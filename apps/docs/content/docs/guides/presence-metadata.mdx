@@ -1,0 +1,152 @@
+---
+title: Presence Metadata
+description: Using metadata for names, colors, avatars, and custom status fields.
+---
+
+Presence metadata is the information each user broadcasts about themselves: their name, avatar, color, status, or any custom data your app needs. It's stored per-user per-room and automatically distributed to everyone in the room.
+
+## Setting initial metadata
+
+Pass `metadata` to `<FlockProvider>`:
+
+```tsx
+<FlockProvider
+  userId="user-123"
+  metadata={{
+    name: "Alice",
+    color: "#7c5cff",
+    avatar: "https://example.com/avatars/alice.jpg",
+  }}
+  ...
+>
+```
+
+Every other user in the room will see this in `usePresence()` immediately when you join.
+
+## Reading others' metadata
+
+```tsx
+function OnlineBar() {
+  const users = usePresence();
+
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      {users.map((user) => (
+        <div
+          key={user.userId}
+          title={user.metadata.name}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: user.metadata.color ?? "#888",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          {user.metadata.avatar ? (
+            <img
+              src={user.metadata.avatar}
+              alt={user.metadata.name}
+              style={{ width: "100%", borderRadius: "50%" }}
+            />
+          ) : (
+            (user.metadata.name ?? "?")[0].toUpperCase()
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Updating your own metadata
+
+`useMyPresence` returns `[yourMetadata, updateFn]`. The updater function sends a partial patch — only the fields you provide change:
+
+```tsx
+function StatusToggle() {
+  const [me, updateMe] = useMyPresence();
+
+  const toggle = () => {
+    updateMe({
+      status: me.status === "away" ? "active" : "away",
+    });
+  };
+
+  return (
+    <button onClick={toggle}>
+      {me.status === "away" ? "Come back" : "Go away"}
+    </button>
+  );
+}
+```
+
+The update is optimistic — `me.status` changes immediately in your own UI, and other users see the change after the server round-trip.
+
+## Custom fields
+
+`UserMetadata` accepts any extra fields beyond the built-in `name`, `color`, and `avatar`:
+
+```ts
+// These are all valid
+updateMe({ status: "in-a-meeting" });
+updateMe({ currentPage: "/checkout" });
+updateMe({ selectedElementId: "rect-42" });
+updateMe({ typing: true });
+```
+
+Other users see these in their `usePresence()` data:
+
+```ts
+const users = usePresence();
+const typingUsers = users.filter((u) => u.metadata.typing);
+```
+
+## User colors
+
+A common pattern is to assign each user a color when they first connect. Pick from a palette based on their user ID so the same user always gets the same color:
+
+```ts
+const COLORS = [
+  "#7c5cff", "#ff5c87", "#ff9f5c", "#5cdfff",
+  "#5cff9f", "#ff5cdf", "#ffdf5c", "#5c87ff",
+];
+
+function colorForUser(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash * 31 + userId.charCodeAt(i)) & 0xffffffff;
+  }
+  return COLORS[Math.abs(hash) % COLORS.length];
+}
+
+// In your provider:
+<FlockProvider
+  metadata={{ name: user.displayName, color: colorForUser(user.id) }}
+  ...
+>
+```
+
+## Presence vs. cursor data
+
+Presence and cursors are separate channels:
+
+- **Presence** is who's in the room and their metadata. It persists until the user leaves (or the TTL expires). Use it for names, colors, avatars, and slow-changing state.
+- **Cursors** are live position updates throttled to ~20/sec. Use them for tracking mouse position, not for general state.
+
+If you need to share fast-changing state that isn't a position, presence metadata is the right place for it. The server merges updates without replacing the full metadata object, so frequent partial updates are fine.
+
+## Persistence across reconnects
+
+Metadata is stored in Redis (when configured) and persists across short disconnects. When a user reconnects, the client re-joins with the same userId and metadata, so other users see a clean re-join rather than losing the user's color and name.
+
+## See also
+
+- [`usePresence` reference](/docs/api-reference/react/use-presence)
+- [`useMyPresence` reference](/docs/api-reference/react/use-my-presence)
+- [Who's online example](/docs/examples/who-is-online)

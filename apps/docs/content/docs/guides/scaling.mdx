@@ -1,0 +1,123 @@
+---
+title: Scaling
+description: How Flock scales horizontally across multiple server instances using Redis pub/sub.
+---
+
+A single Flock server instance handles thousands of concurrent WebSocket connections without issue. Horizontal scaling (multiple instances behind a load balancer) becomes relevant when you need:
+
+- More than one process for redundancy or failover
+- Multi-region deployments to reduce latency for geographically distributed users
+- More total connections than a single server can handle
+
+## How it works
+
+When multiple Flock instances share the same Redis, they coordinate via a pub/sub channel per room.
+
+```
+Client A (tab 1)           Client B (tab 2)
+     |                           |
+  Instance 1 ---- Redis ---- Instance 2
+     |               |           |
+     |         pub/sub fan-out   |
+     |                           |
+  Client A receives           Client B receives
+  cursor:updated from B       cursor:updated from A
+```
+
+When Client A sends a cursor move to Instance 1:
+1. Instance 1 delivers it to all local clients in that room (fast, in-process).
+2. Instance 1 publishes it to `flock:broadcast:{roomId}` in Redis.
+3. Instance 2 (and any other instances) receive it from Redis and deliver it to their local clients.
+
+Each instance tags its own publishes with a unique `instanceId` and ignores messages it published itself, preventing double-delivery.
+
+## Enabling Redis mode
+
+Set `FLOCK_REDIS_URL` on all instances. That's it.
+
+```bash
+# Instance 1
+FLOCK_PORT=8787 FLOCK_REDIS_URL=redis://your-redis:6379 npx @flock-sdk/server
+
+# Instance 2 (same Redis, different port or machine)
+FLOCK_PORT=8788 FLOCK_REDIS_URL=redis://your-redis:6379 npx @flock-sdk/server
+```
+
+## WebSocket stickiness
+
+WebSocket connections are stateful — once a client connects to an instance, it stays there for the duration of the connection. Your load balancer must use **sticky sessions** (also called session affinity) to route a client back to the same instance if it disconnects and reconnects during a rolling restart.
+
+Most load balancers support this:
+
+- **Nginx**: `ip_hash` or `sticky cookie`
+- **AWS ALB**: sticky target groups
+- **Fly.io**: sticky sessions are the default for WebSocket apps
+
+Without stickiness, a reconnecting client may land on a different instance, which is fine (Flock handles it), but causes a brief visible re-join for other users.
+
+## Redis requirements
+
+Any Redis 6+ instance works. Recommended managed options:
+
+- **Upstash** — serverless Redis, has a generous free tier, one-click keyspace notifications
+- **Redis Cloud** — managed Redis by Redis Inc., good free tier
+- **Railway Redis** — simple setup, pairs well with Railway app deploys
+
+Whichever you use, enable keyspace notifications with the `Ex` flag (expired events). Without this, idle user eviction won't work.
+
+## Multi-region on Fly.io
+
+Fly.io makes multi-region deployment straightforward. Create a `fly.toml` that deploys to multiple regions and point all instances at the same Redis.
+
+Example `fly.toml` for a two-region setup (US East + Germany):
+
+```toml
+app = "flock-server"
+primary_region = "iad"
+
+[build]
+  dockerfile = "packages/server/Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "5s"
+    interval = "10s"
+    method = "GET"
+    path = "/health"
+    timeout = "3s"
+```
+
+Deploy to multiple regions:
+
+```bash
+fly deploy --region iad,fra
+```
+
+Set the Redis URL as a secret:
+
+```bash
+fly secrets set FLOCK_REDIS_URL=rediss://user:pass@your-upstash-host:6380
+```
+
+Fly routes WebSocket connections to the nearest region. All instances share the same Redis so cursors and presence propagate across regions, with the Redis pub/sub round-trip as the only added latency.
+
+## Load testing
+
+A single `shared-cpu-1x` Fly.io machine (1 vCPU, 256MB RAM) handles around 1,000 to 2,000 concurrent WebSocket connections with moderate cursor traffic. For higher volumes, increase `vm.memory` or run multiple machines per region.
+
+The bottleneck in high-traffic scenarios is typically Redis pub/sub throughput. Upstash's free tier has a 1,000 commands/sec limit; paid tiers remove the cap.
+
+## See also
+
+- [Self-hosting guide](/docs/guides/self-hosting) — Docker Compose setup with Redis
+- [FlockServer options](/docs/api-reference/server/flock-server) — programmatic configuration

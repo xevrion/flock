@@ -1,0 +1,222 @@
+---
+title: Custom Cursor Rendering
+description: How to render live cursors your way — HTML overlay, Canvas, or SVG.
+---
+
+`useCursors()` gives you a `Record<userId, UserCursor>` with each user's current position (normalized 0–1) and metadata. What you do with it is entirely up to you. This guide shows three approaches.
+
+## The data you get
+
+```ts
+const cursors = useCursors();
+
+// cursors looks like:
+{
+  "user-abc": {
+    userId: "user-abc",
+    position: { x: 0.42, y: 0.77 },   // 0–1, normalized to viewport
+    metadata: { name: "Alice", color: "#7c5cff" },
+    lastUpdatedAt: 1719432891234,
+  },
+  // ...
+}
+```
+
+Positions are normalized: `x: 0` is left edge, `x: 1` is right edge, same for y. Multiply by `window.innerWidth` (or by an element's dimensions) to get pixel coordinates.
+
+## Approach 1: HTML overlay
+
+A fixed-position `div` that covers the whole viewport, with each cursor absolutely positioned inside it. Simple and easy to style.
+
+```tsx
+function CursorOverlay() {
+  const cursors = useCursors();
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        pointerEvents: "none",   // never block mouse events
+        zIndex: 9999,
+      }}
+    >
+      {Object.values(cursors).map((cursor) => (
+        <div
+          key={cursor.userId}
+          style={{
+            position: "absolute",
+            left: `${cursor.position.x * 100}%`,
+            top: `${cursor.position.y * 100}%`,
+            transform: "translate(-4px, -4px)",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path
+              d="M0 0 L0 12 L3.5 9 L6 14 L8 13 L5.5 8 L10 8 Z"
+              fill={cursor.metadata.color ?? "#000"}
+              stroke="white"
+              strokeWidth="1"
+            />
+          </svg>
+          <span
+            style={{
+              marginLeft: 12,
+              background: cursor.metadata.color ?? "#000",
+              color: "white",
+              fontSize: 12,
+              padding: "2px 6px",
+              borderRadius: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {cursor.metadata.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+This approach works well for full-page experiences (dashboards, docs, marketing pages).
+
+## Approach 2: Canvas
+
+When you have an HTML5 canvas element, draw cursors directly on it (or on a transparent overlay canvas). Useful for collaborative canvas apps like the [demo](/docs/examples/collaborative-canvas).
+
+The trick is to track cursor positions **relative to the canvas**, not the viewport. Normalize against the canvas element's bounding rect instead of `window.inner*`.
+
+```tsx
+function CollaborativeCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cursors = useCursors();
+  const room = useRoom();
+
+  // Send cursor position relative to this canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      room.updateCursor({
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      });
+    };
+
+    canvas.addEventListener("mousemove", onMove);
+    return () => canvas.removeEventListener("mousemove", onMove);
+  }, [room]);
+
+  // Draw cursors on every animation frame
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let rafId: number;
+
+    const draw = () => {
+      // clear cursor layer (assumes you have separate layers or clear + redraw)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const cursor of Object.values(cursors)) {
+        const x = cursor.position.x * canvas.width;
+        const y = cursor.position.y * canvas.height;
+
+        // draw dot
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = cursor.metadata.color ?? "#000";
+        ctx.fill();
+
+        // draw name
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(cursor.metadata.name ?? cursor.userId, x + 10, y + 4);
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    rafId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafId);
+  }, [cursors]);
+
+  return <canvas ref={canvasRef} width={800} height={600} />;
+}
+```
+
+Note that with canvas rendering you may want to turn off the SDK's interpolation (`interpolate={false}` on the provider) if you're doing your own smoothing, or keep it on to let the SDK handle it for you.
+
+## Approach 3: SVG
+
+SVG is a good middle ground — vector rendering with full CSS styling. Works well for diagram editors, flowcharts, or any app already using SVG.
+
+```tsx
+function SVGCursorLayer({ width, height }: { width: number; height: number }) {
+  const cursors = useCursors();
+
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+      }}
+      width={width}
+      height={height}
+    >
+      {Object.values(cursors).map((cursor) => {
+        const x = cursor.position.x * width;
+        const y = cursor.position.y * height;
+
+        return (
+          <g key={cursor.userId} transform={`translate(${x}, ${y})`}>
+            <circle
+              r={6}
+              fill={cursor.metadata.color ?? "#000"}
+              stroke="white"
+              strokeWidth={2}
+            />
+            <text
+              x={10}
+              y={4}
+              fill={cursor.metadata.color ?? "#000"}
+              fontSize={12}
+              fontFamily="sans-serif"
+            >
+              {cursor.metadata.name}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+```
+
+## Filtering out-of-bounds cursors
+
+Users who move the mouse outside your tracked area may send sentinel values or last-known positions. A common pattern is to skip cursors with positions outside 0–1:
+
+```ts
+const visibleCursors = Object.values(cursors).filter(
+  (c) => c.position.x >= 0 && c.position.x <= 1 &&
+         c.position.y >= 0 && c.position.y <= 1
+);
+```
+
+## Interpolation
+
+`useCursors` runs its own interpolation loop by default (configurable via the `interpolate` and `interpolationMs` props on `<FlockProvider>`). You get already-smoothed positions in the canvas/SVG/HTML approaches above — no extra work needed.
+
+If you want to do your own smoothing (e.g., a spring physics simulation), pass `interpolate={false}` to get raw received positions and handle the animation yourself.
+
+## See also
+
+- [`useCursors` API reference](/docs/api-reference/react/use-cursors)
+- [Collaborative canvas example](/docs/examples/collaborative-canvas)

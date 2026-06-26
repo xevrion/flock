@@ -1,0 +1,139 @@
+---
+title: Self-Hosting
+description: Run the Flock server on your own infrastructure with Docker Compose.
+---
+
+The Flock server is a single Node.js process. You can run it with npx, Docker, or embed it in an existing Node server. This guide covers the recommended Docker Compose setup for production.
+
+## Quickstart: npx
+
+For local development or quick experiments:
+
+```bash
+npx @flock-sdk/server
+```
+
+The server starts on port 8787 with no Redis (in-memory only, no TTL eviction). Fine for a single dev machine.
+
+## Production: Docker Compose
+
+For production you'll want Redis alongside the server. Redis enables presence TTL eviction (users are cleaned up when they close the tab without a clean disconnect) and horizontal scaling across multiple server instances.
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --notify-keyspace-events Ex
+    volumes:
+      - redis_data:/data
+
+  flock:
+    image: ghcr.io/xevrion/flock-server:latest
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      FLOCK_PORT: "8787"
+      FLOCK_REDIS_URL: "redis://redis:6379"
+      FLOCK_PRESENCE_TTL_SECONDS: "30"
+      FLOCK_LOG_LEVEL: "info"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8787/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+```
+
+Start it:
+
+```bash
+docker compose up -d
+```
+
+Check it's running:
+
+```bash
+curl http://localhost:8787/health
+# {"status":"ok"}
+```
+
+## Building the image yourself
+
+If you want to build from source rather than using the published image:
+
+```bash
+git clone https://github.com/xevrion/flock
+docker build -f packages/server/Dockerfile -t flock-server .
+docker run -p 8787:8787 flock-server
+```
+
+## Environment variable reference
+
+| Variable | Default | Description |
+|---|---|---|
+| `FLOCK_PORT` | `8787` | Port the server listens on |
+| `FLOCK_REDIS_URL` | — | Redis URL. Omit to run without Redis (no TTL eviction, single-instance only) |
+| `FLOCK_API_KEYS` | — | Comma-separated list of accepted API keys. Omit for unauthenticated (open) mode |
+| `FLOCK_PRESENCE_TTL_SECONDS` | `30` | Seconds before an idle user (stopped heartbeating) is evicted |
+| `FLOCK_HEARTBEAT_INTERVAL_MS` | `10000` | Expected client heartbeat interval |
+| `FLOCK_MAX_MESSAGES_PER_SECOND` | `100` | Per-connection rate limit; connections above this are closed |
+| `FLOCK_LOG_LEVEL` | `info` | Pino log level: `trace`, `debug`, `info`, `warn`, `error`, `silent` |
+
+## API key authentication
+
+If you set `FLOCK_API_KEYS`, the server rejects any client that doesn't send a matching key. Add the key to your client:
+
+```tsx
+<FlockProvider
+  serverUrl="wss://your-server.com"
+  apiKey="your-secret-key"
+  ...
+>
+```
+
+Keep the key out of version control. In Vercel or similar platforms, add it as an environment variable and reference it in your Next.js app:
+
+```tsx
+<FlockProvider
+  apiKey={process.env.NEXT_PUBLIC_FLOCK_API_KEY}
+  ...
+>
+```
+
+## Redis keyspace notifications
+
+The `--notify-keyspace-events Ex` flag is required for presence TTL eviction to work. Without it, Redis won't publish expired-key events and the server won't know when a user's heartbeat has expired.
+
+If you're using a managed Redis service (Upstash, Redis Cloud, etc.), enable keyspace notifications in the provider's dashboard. Upstash exposes this as a toggle. Redis Cloud has it in the database config.
+
+## Reverse proxy / TLS
+
+For production, put the server behind nginx or Caddy to handle TLS termination. The server speaks plain WebSocket and HTTP; your reverse proxy upgrades `ws://` to `wss://` for the client.
+
+Minimal nginx snippet for a WebSocket upstream:
+
+```nginx
+location /flock/ {
+    proxy_pass http://localhost:8787/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 86400;
+}
+```
+
+## Next steps
+
+- [Scaling guide](/docs/guides/scaling) — how to run multiple instances behind a load balancer
+- [Configuration reference](/docs/api-reference/server/configuration) — full env var docs

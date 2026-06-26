@@ -31,8 +31,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Never push — PRD, Claude/agent files
+# Never push — PRD, Claude/agent files, local-only docs
 FLOCK.md
 CLAUDE.md
 LOG.md
+LAUNCH.md
 .claude/

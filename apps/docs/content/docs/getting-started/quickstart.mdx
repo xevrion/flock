@@ -108,13 +108,17 @@ function Canvas() {
 }
 ```
 
+## Try it live
+
+Open this page in two browser tabs and move your mouse in the area below:
+
+<LiveDemo />
+
+If the demo shows "Server not available", start the server locally first (`npx @flock-sdk/server`) and set `NEXT_PUBLIC_FLOCK_SERVER_URL=ws://localhost:8787` in `apps/docs/.env.local`.
+
 ## Next steps
 
-- [See it live](/demo) — the canvas demo with live cursors
+- [See the canvas demo](/demo) — standalone demo with cursors and presence
 - [Concepts](/docs/getting-started/concepts) — rooms, presence, and cursor data explained
 - [Self-hosting guide](/docs/guides/self-hosting) — Docker Compose setup with Redis
 - [API reference](/docs/api-reference/core/flock-client) — full TypeScript API
-
----
-
-**Note:** The live demo at `/demo` and `npx @flock-sdk/server` both require the packages to be published to npm (coming in the full release). For now, clone the repo and run locally.

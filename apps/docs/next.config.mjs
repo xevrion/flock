@@ -11,6 +11,7 @@ const config = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  transpilePackages: ["@flock-sdk/react", "@flock-sdk/core"],
 };
 
 export default withMDX(config);

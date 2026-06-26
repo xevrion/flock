@@ -1,0 +1,79 @@
+---
+title: Concepts
+description: Rooms, presence, cursors, and how the three packages relate.
+---
+
+## Rooms
+
+A **room** is the fundamental Flock primitive. A room is a named channel that users join to see each other. Everyone in the same room can see each other's cursors and presence state.
+
+You create a room by passing a `roomId` to `<FlockProvider>`. Users with the same `roomId` are in the same room. Users in different rooms cannot see each other.
+
+```tsx
+// These two users can see each other
+<FlockProvider roomId="design-review-42" ...>
+
+// This user is in a different room and is invisible to the first two
+<FlockProvider roomId="design-review-43" ...>
+```
+
+Rooms are created automatically when the first user joins and destroyed when the last user leaves. No setup needed.
+
+## Presence
+
+**Presence** is metadata about a user: their name, avatar, color, or any custom fields your app needs. Every user in a room broadcasts their presence to everyone else.
+
+```tsx
+// Set presence on join
+<FlockProvider
+  userId="user-123"
+  metadata={{ name: "Alice", color: "#7c5cff", role: "editor" }}
+  ...
+>
+
+// Read others' presence
+function OnlineUsers() {
+  const users = usePresence();
+  return users.map(u => <span key={u.userId}>{u.metadata.name}</span>);
+}
+```
+
+Presence updates are merged, not replaced. Calling `updatePresence({ status: "idle" })` adds or updates the `status` field without touching `name` or `color`.
+
+## Cursors
+
+**Cursor** data is separate from presence: it is the live position of each user's mouse (or touch point, or any coordinate you want to track). Cursors are:
+
+- **Throttled** by default to 20 updates/sec (configurable) so they don't overwhelm the server
+- **Normalized** to 0–1 coordinates so they line up across different screen sizes
+- **Interpolated** on the receiving end for smooth motion between updates
+
+```tsx
+function Cursors() {
+  const cursors = useCursors();
+  // cursors is a Record<userId, UserCursor>
+  // cursor.position = { x: 0–1, y: 0–1 }
+}
+```
+
+## How the packages relate
+
+```
+@flock-sdk/server          @flock-sdk/core
+(WebSocket server)  <-->   (browser client)
+                               ^
+                               | wraps
+                           @flock-sdk/react
+                           (React hooks)
+```
+
+- **`@flock-sdk/server`** runs on your server (Node.js, Docker, or npx). It receives messages from clients and fans them out to others in the same room. It can optionally use Redis for multi-instance horizontal scaling.
+- **`@flock-sdk/core`** is the browser client. It manages the WebSocket connection, reconnection, heartbeats, and room state. No React required — you can use it in any framework.
+- **`@flock-sdk/react`** wraps `@flock-sdk/core` in React hooks and context. Use `<FlockProvider>` once, then call `useCursors()`, `usePresence()`, and `useMyPresence()` anywhere in the tree.
+
+## Why split into three packages?
+
+The split keeps bundle sizes small and lets you use only what you need:
+- A vanilla JS app uses just `@flock-sdk/core` (under 10KB gzipped)
+- A React app adds `@flock-sdk/react` (under 5KB gzipped on top)
+- The server package is never included in the browser bundle

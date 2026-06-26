@@ -1,0 +1,120 @@
+---
+title: Quickstart
+description: Add live cursors to your React app in under 5 minutes.
+---
+
+## 1. Start the server
+
+The Flock server handles all the WebSocket connections. Run it locally with npx (no install needed):
+
+```bash
+npx @flock-sdk/server
+```
+
+Or with Docker:
+
+```bash
+docker run -p 8787:8787 ghcr.io/xevrion/flock-server:latest
+```
+
+The server starts on port 8787 by default. You should see:
+
+```
+flock server starting
+  port:      8787
+  redis:     none (single-instance mode)
+```
+
+## 2. Install the React package
+
+```bash
+npm install @flock-sdk/react
+```
+
+## 3. Add cursors to your app
+
+Wrap your app (or just the page that needs cursors) in `<FlockProvider>`, then call `useCursors()` to render other users' cursor positions:
+
+```tsx
+import { FlockProvider, useCursors } from "@flock-sdk/react";
+
+function CursorOverlay() {
+  const cursors = useCursors();
+  return (
+    <>
+      {Object.values(cursors).map((cursor) => (
+        <div
+          key={cursor.userId}
+          style={{
+            position: "fixed",
+            left: `${cursor.position.x * 100}%`,
+            top: `${cursor.position.y * 100}%`,
+            pointerEvents: "none",
+          }}
+        >
+          {cursor.metadata.name}
+        </div>
+      ))}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <FlockProvider
+      serverUrl="ws://localhost:8787"
+      roomId="my-room"
+      userId="user-123"
+      metadata={{ name: "Alice" }}
+    >
+      <CursorOverlay />
+      {/* rest of your app */}
+    </FlockProvider>
+  );
+}
+```
+
+Open this page in two browser tabs and move your mouse — you'll see each tab's cursor in the other.
+
+## 4. Track mouse movement
+
+By default, Flock tracks the mouse relative to the viewport and normalizes positions to 0–1 so cursors line up across different screen sizes. No extra code needed — the provider handles it.
+
+To track within a specific element (like a canvas):
+
+```tsx
+import { useRoom } from "@flock-sdk/react";
+import { useEffect, useRef } from "react";
+
+function Canvas() {
+  const room = useRoom();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      room.updateCursor({
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      });
+    };
+    el.addEventListener("mousemove", onMove);
+    return () => el.removeEventListener("mousemove", onMove);
+  }, [room]);
+
+  return <div ref={ref} style={{ width: "100%", height: "100%" }} />;
+}
+```
+
+## Next steps
+
+- [See it live](/demo) — the canvas demo with live cursors
+- [Concepts](/docs/getting-started/concepts) — rooms, presence, and cursor data explained
+- [Self-hosting guide](/docs/guides/self-hosting) — Docker Compose setup with Redis
+- [API reference](/docs/api-reference/core/flock-client) — full TypeScript API
+
+---
+
+**Note:** The live demo at `/demo` and `npx @flock-sdk/server` both require the packages to be published to npm (coming in the full release). For now, clone the repo and run locally.

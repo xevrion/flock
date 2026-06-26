@@ -10,6 +10,8 @@ build/
 out/
 next-env.d.ts
 *.tsbuildinfo
+# fumadocs-mdx generated source map
+.source/
 
 # Logs
 *.log

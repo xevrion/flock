@@ -1,0 +1,65 @@
+---
+title: Installation
+description: Install Flock in your project and choose a server hosting path.
+---
+
+## Client packages
+
+```bash
+# React adapter (includes @flock-sdk/core as a dependency)
+npm install @flock-sdk/react
+
+# Framework-agnostic core only
+npm install @flock-sdk/core
+```
+
+## Server options
+
+### Option 1: npx (quickest)
+
+No install needed. Just run:
+
+```bash
+npx @flock-sdk/server
+```
+
+Environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `FLOCK_PORT` | `8787` | Port to listen on |
+| `FLOCK_REDIS_URL` | — | Redis URL for multi-instance mode |
+| `FLOCK_API_KEYS` | — | Comma-separated keys (omit for open mode) |
+| `FLOCK_PRESENCE_TTL_SECONDS` | `30` | Seconds before an idle user is evicted |
+
+### Option 2: Docker
+
+```bash
+docker run -p 8787:8787 ghcr.io/xevrion/flock-server:latest
+```
+
+With Redis (for scaling across multiple instances):
+
+```bash
+docker run -p 8787:8787 \
+  -e FLOCK_REDIS_URL=redis://your-redis-host:6379 \
+  ghcr.io/xevrion/flock-server:latest
+```
+
+### Option 3: Programmatic (embed in an existing Node server)
+
+```ts
+import { FlockServer } from "@flock-sdk/server";
+
+const server = new FlockServer({
+  port: 8787,
+  redisUrl: process.env.REDIS_URL,
+});
+
+await server.start();
+```
+
+## Requirements
+
+- Node.js 22 or later
+- React 18+ (for `@flock-sdk/react`)
